@@ -100,6 +100,38 @@ export function ExpenseFormModal({
       toast.error('Select at least one participant');
       return;
     }
+    if (splitType !== 'equal') {
+      const values = selectedMembers.map(
+        (id) => parseFloat(customSplits[id] || '0') || 0
+      );
+
+      if (values.some((value) => value <= 0)) {
+        toast.error('Enter a valid split value for every selected member');
+        return;
+      }
+
+      if (splitType === 'exact') {
+        const total = values.reduce((sum, value) => sum + value, 0);
+
+        if (Math.abs(total - amount) > 0.01) {
+          toast.error(
+            `Exact split must total ₹${amount.toFixed(2)}. Currently ₹${total.toFixed(2)}.`
+          );
+          return;
+        }
+      }
+
+      if (splitType === 'percentage') {
+        const total = values.reduce((sum, value) => sum + value, 0);
+
+        if (Math.abs(total - 100) > 0.01) {
+          toast.error(
+            `Percentages must total 100%. Currently ${total.toFixed(1)}%.`
+          );
+          return;
+        }
+      }
+    }
 
     try {
       setIsSubmitting(true);
@@ -314,8 +346,8 @@ export function ExpenseFormModal({
                   key={type}
                   onClick={() => setSplitType(type)}
                   className={`py-2 px-1 rounded-xl text-xs font-medium flex flex-col items-center gap-1 transition-all ${splitType === type
-                      ? 'bg-gradient-to-r from-cyan-500 to-indigo-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+                    ? 'bg-gradient-to-r from-cyan-500 to-indigo-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
                     }`}
                 >
                   <Icon className="w-3.5 h-3.5" />
@@ -345,8 +377,8 @@ export function ExpenseFormModal({
                   <div
                     key={m.id}
                     className={`flex items-center justify-between p-2.5 rounded-xl border transition-all ${isSelected
-                        ? 'bg-white/[0.06] border-cyan-500/40'
-                        : 'bg-white/[0.02] border-white/5 opacity-50'
+                      ? 'bg-white/[0.06] border-cyan-500/40'
+                      : 'bg-white/[0.02] border-white/5 opacity-50'
                       }`}
                   >
                     <button
