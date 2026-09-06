@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -24,15 +24,7 @@ import {
 import type { Member, Category } from '@/types';
 import { toast } from 'sonner';
 
-export const DEFAULT_CATEGORIES: Category[] = [
-  { id: 'food', trip_id: null, name: 'Food & Dining', icon: '🍔', color: '#f97316', is_default: true, created_at: '' },
-  { id: 'travel', trip_id: null, name: 'Travel & Fuel', icon: '🚗', color: '#06b6d4', is_default: true, created_at: '' },
-  { id: 'stay', trip_id: null, name: 'Stay & Hotels', icon: '🏨', color: '#6366f1', is_default: true, created_at: '' },
-  { id: 'activities', trip_id: null, name: 'Fun & Activities', icon: '🏖️', color: '#ec4899', is_default: true, created_at: '' },
-  { id: 'groceries', trip_id: null, name: 'Groceries & Drinks', icon: '🛒', color: '#10b981', is_default: true, created_at: '' },
-  { id: 'tickets', trip_id: null, name: 'Tickets & Passes', icon: '🎟️', color: '#eab308', is_default: true, created_at: '' },
-  { id: 'other', trip_id: null, name: 'General / Other', icon: '💸', color: '#8b5cf6', is_default: true, created_at: '' },
-];
+
 
 interface ExpenseFormModalProps {
   isOpen: boolean;
@@ -53,7 +45,9 @@ export function ExpenseFormModal({
   currentMemberId,
   onSuccess,
 }: ExpenseFormModalProps) {
-  const activeCategories = (categories && categories.length > 0) ? categories : DEFAULT_CATEGORIES;
+
+
+  const activeCategories = categories ?? [];
 
   const [title, setTitle] = useState('');
   const [amountRupees, setAmountRupees] = useState('');
@@ -61,11 +55,20 @@ export function ExpenseFormModal({
   const [splitType, setSplitType] = useState<'equal' | 'exact' | 'percentage' | 'shares'>('equal');
   const [selectedMembers, setSelectedMembers] = useState<string[]>(members.map((m) => m.id));
   const [customSplits, setCustomSplits] = useState<{ [memberId: string]: string }>({});
-  const [categoryId, setCategoryId] = useState<string>(activeCategories[0]?.id || 'food');
+  const [categoryId, setCategoryId] = useState<string>('');
   const [note, setNote] = useState('');
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (
+      activeCategories.length > 0 &&
+      !activeCategories.some((category) => category.id === categoryId)
+    ) {
+      setCategoryId(activeCategories[0].id);
+    }
+  }, [activeCategories, categoryId]);
 
   if (!isOpen) return null;
 
@@ -178,7 +181,11 @@ export function ExpenseFormModal({
           split_type: splitType,
           participant_ids: selectedMembers,
           splits: splitsPayload,
-          category_id: categoryId || undefined,
+          category_id:
+            categoryId &&
+              /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(categoryId)
+              ? categoryId
+              : undefined,
           note: note.trim() || undefined,
           expense_date: expenseDate,
           receipt_url,

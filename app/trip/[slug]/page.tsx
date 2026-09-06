@@ -25,7 +25,7 @@ import { MountainBackground } from '@/components/shared/MountainBackground';
 import { StatCard } from '@/components/shared/StatCard';
 import { BalanceCard } from '@/components/shared/BalanceCard';
 import { ExpenseCard } from '@/components/money/ExpenseCard';
-import { MediaCard } from '@/components/memories/MediaCard';
+import { FeaturedMemoriesCarousel } from '@/components/memories/FeaturedMemoriesCarousel';
 import { ExpenseFormModal } from '@/components/money/ExpenseFormModal';
 import { SettleUpModal } from '@/components/money/SettleUpModal';
 import { UploadModal } from '@/components/memories/UploadModal';
@@ -68,19 +68,31 @@ export default function TripDashboardPage() {
     try {
       setIsLoading(true);
 
-      const [eRes, mRes, sRes] = await Promise.all([
+      const [eRes, mRes, sRes, tRes] = await Promise.all([
         fetch(`/api/expenses?trip_id=${trip.id}`),
         fetch(`/api/media?trip_id=${trip.id}`),
         fetch(`/api/settlements?trip_id=${trip.id}`),
+        fetch(`/api/trips/${trip.slug}`),
       ]);
 
       const expData: ExpenseWithDetails[] = eRes.ok ? await eRes.json() : [];
       const mList: MediaWithDetails[] = mRes.ok ? await mRes.json() : [];
+
+      console.log('🏠 HOME MEDIA RESPONSE:', {
+        ok: mRes.ok,
+        status: mRes.status,
+        count: mList.length,
+        media: mList,
+      });
       const setData = sRes.ok ? await sRes.json() : {};
+      const tripData = tRes.ok ? await tRes.json() : {};
 
       setExpenses(expData);
       setMediaList(mList);
       setSimplifiedDebts(setData.simplifiedDebts || []);
+      if (tripData.categories && tripData.categories.length > 0) {
+        setCategories(tripData.categories);
+      }
 
       const total = expData.reduce((acc, curr) => acc + curr.amount_paise, 0);
       setTotalSpentPaise(total);
@@ -167,59 +179,55 @@ export default function TripDashboardPage() {
       <TripHeader title={trip.name} />
 
       <main className="max-w-7xl mx-auto w-full px-4 md:px-6 py-6 space-y-6">
+        {/* Featured Trip Memories */}
+        {mediaList.length > 0 && (
+          <FeaturedMemoriesCarousel
+            mediaList={mediaList}
+            onOpenViewer={(index) => setViewerIndex(index)}
+          />
+        )}
+
         {/* Hero Cover Banner */}
-        <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-[#0e1633] via-[#090d21] to-[#050711] border border-white/[0.1] p-6 md:p-8 shadow-2xl">
-          <WaveBackground className="absolute inset-0 opacity-40" />
-          <MountainBackground className="absolute bottom-0 left-0 right-0 h-32 opacity-25" />
+        {/* Trip Title */}
+        <div className="px-1">
+          <h1 className="text-3xl md:text-5xl font-extrabold font-outfit text-white tracking-tight">
+            {trip.name}
+          </h1>
 
-          <div className="relative z-10 max-w-2xl">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="px-3 py-1 rounded-full bg-cyan-500/15 text-cyan-300 text-xs font-bold backdrop-blur-md border border-cyan-500/25 inline-flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-cyan-400" /> Trip Operating System
-              </span>
-              {trip.start_date && (
-                <span className="px-3 py-1 rounded-full bg-white/[0.06] text-slate-300 text-xs font-mono font-medium backdrop-blur-md border border-white/5 inline-flex items-center gap-1">
-                  <Calendar className="w-3 h-3 text-cyan-400" />
-                  {new Date(trip.start_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
-                </span>
-              )}
-            </div>
+          {trip.description && (
+            <p className="text-sm text-slate-400 mt-2 max-w-2xl leading-relaxed">
+              {trip.description}
+            </p>
+          )}
 
-            <h2 className="text-3xl md:text-5xl font-extrabold font-outfit text-white tracking-tight leading-tight">
-              {trip.name}
-            </h2>
-            {trip.description && (
-              <p className="text-xs md:text-sm text-slate-300 mt-2 line-clamp-2 max-w-xl font-normal leading-relaxed">
-                {trip.description}
-              </p>
-            )}
+          {/* Quick Actions */}
+          <div className="flex flex-wrap gap-2.5 mt-5">
+            <button
+              id="hero-add-expense"
+              onClick={() => setIsExpenseModalOpen(true)}
+              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white text-xs md:text-sm font-bold shadow-lg shadow-pink-500/25 flex items-center gap-1.5 transition-all active:scale-95"
+            >
+              <Wallet className="w-4 h-4" />
+              Add Expense
+            </button>
 
-            {/* Quick Action Pills */}
-            <div className="flex flex-wrap gap-2.5 mt-6">
-              <button
-                id="hero-add-expense"
-                onClick={() => setIsExpenseModalOpen(true)}
-                className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white text-xs md:text-sm font-bold shadow-lg shadow-pink-500/25 flex items-center gap-1.5 transition-all active:scale-95"
-              >
-                <Wallet className="w-4 h-4" /> Add Expense
-              </button>
+            <button
+              id="hero-upload-media"
+              onClick={() => setIsUploadModalOpen(true)}
+              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-500 hover:to-blue-600 text-slate-950 text-xs md:text-sm font-extrabold shadow-lg shadow-cyan-400/25 flex items-center gap-1.5 transition-all active:scale-95"
+            >
+              <Camera className="w-4 h-4" />
+              Upload Photos
+            </button>
 
-              <button
-                id="hero-upload-media"
-                onClick={() => setIsUploadModalOpen(true)}
-                className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-500 hover:to-blue-600 text-slate-950 text-xs md:text-sm font-extrabold shadow-lg shadow-cyan-400/25 flex items-center gap-1.5 transition-all active:scale-95"
-              >
-                <Camera className="w-4 h-4" /> Upload Photos
-              </button>
-
-              <button
-                id="hero-settle-up"
-                onClick={() => setIsSettleModalOpen(true)}
-                className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-xs md:text-sm font-bold shadow-lg shadow-emerald-500/25 flex items-center gap-1.5 transition-all active:scale-95"
-              >
-                <HandCoins className="w-4 h-4" /> Settle Up (UPI)
-              </button>
-            </div>
+            <button
+              id="hero-settle-up"
+              onClick={() => setIsSettleModalOpen(true)}
+              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-xs md:text-sm font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-1.5 transition-all active:scale-95"
+            >
+              <HandCoins className="w-4 h-4" />
+              Settle Up (UPI)
+            </button>
           </div>
         </div>
 
@@ -263,26 +271,31 @@ export default function TripDashboardPage() {
         {/* Trip Pulse AI Insights */}
         {pulseItems.length > 0 && <TripPulseWidget pulseItems={pulseItems} />}
 
-        {/* Memories Preview Carousel */}
+        {/* Recent Vault Memories */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold font-outfit text-white flex items-center gap-2">
-              <Camera className="w-4 h-4 text-cyan-400" /> Recent Vault Memories
+              <Camera className="w-4 h-4 text-cyan-400" />
+              Recent Vault Memories
             </h3>
+
             <Link
               href={`/trip/${trip.slug}/memories`}
               className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
             >
-              View Full Gallery ({mediaList.length}) <ChevronRight className="w-3.5 h-3.5" />
+              View Full Gallery ({mediaList.length})
+              <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
           {mediaList.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
               {mediaList.slice(0, 6).map((item, idx) => (
-                <MediaCard
+                <img
                   key={item.id}
-                  media={item}
+                  src={item.url || item.thumbnail_url || ''}
+                  alt={item.original_filename || 'Trip memory'}
+                  className="w-full aspect-square object-cover rounded-2xl border border-white/10 cursor-pointer hover:scale-[1.02] transition-transform"
                   onClick={() => setViewerIndex(idx)}
                 />
               ))}

@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Clock, 
-  Plus, 
-  Sparkles, 
-  Calendar 
+import {
+  Clock,
+  Plus,
+  Sparkles,
+  Calendar
 } from 'lucide-react';
 import { useActiveTrip } from '@/components/shared/ActiveTripContext';
 import { TripHeader } from '@/components/shared/TripHeader';
@@ -89,9 +89,9 @@ export default function TimelinePage() {
       </main>
 
       <FloatingActionButton
-        onAddExpense={() => {}}
-        onUploadMedia={() => {}}
-        onSettleUp={() => {}}
+        onAddExpense={() => { }}
+        onUploadMedia={() => { }}
+        onSettleUp={() => { }}
         onAddTimeline={() => setIsAddModalOpen(true)}
       />
 

@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  Wallet, 
-  Plus, 
-  HandCoins, 
-  Search, 
-  Filter, 
+import {
+  Wallet,
+  Plus,
+  HandCoins,
+  Search,
+  Filter,
   ArrowUpDown,
   Download,
   Receipt,
@@ -19,7 +19,7 @@ import {
 import { useActiveTrip } from '@/components/shared/ActiveTripContext';
 import { TripHeader } from '@/components/shared/TripHeader';
 import { ExpenseCard } from '@/components/money/ExpenseCard';
-import { ExpenseFormModal, DEFAULT_CATEGORIES } from '@/components/money/ExpenseFormModal';
+import { ExpenseFormModal } from '@/components/money/ExpenseFormModal';
 import { SettleUpModal } from '@/components/money/SettleUpModal';
 import { BalanceCard } from '@/components/shared/BalanceCard';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -33,7 +33,7 @@ export default function MoneyPage() {
   const { trip, members, currentMember, refreshTrip } = useActiveTrip();
 
   const [expenses, setExpenses] = useState<ExpenseWithDetails[]>([]);
-  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [simplifiedDebts, setSimplifiedDebts] = useState<SimplifiedDebt[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -180,11 +180,10 @@ export default function MoneyPage() {
         <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none">
           <button
             onClick={() => setSelectedCategory('all')}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-              selectedCategory === 'all'
-                ? 'bg-cyan-500 text-slate-950 font-extrabold shadow-md'
-                : 'bg-white/[0.04] text-slate-400 hover:text-white border border-white/5'
-            }`}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${selectedCategory === 'all'
+              ? 'bg-cyan-500 text-slate-950 font-extrabold shadow-md'
+              : 'bg-white/[0.04] text-slate-400 hover:text-white border border-white/5'
+              }`}
           >
             All Categories ({expenses.length})
           </button>
@@ -195,11 +194,10 @@ export default function MoneyPage() {
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition-all ${
-                  isSelected
-                    ? 'bg-cyan-500 text-slate-950 font-extrabold shadow-md'
-                    : 'bg-white/[0.04] text-slate-300 hover:text-white border border-white/5'
-                }`}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition-all ${isSelected
+                  ? 'bg-cyan-500 text-slate-950 font-extrabold shadow-md'
+                  : 'bg-white/[0.04] text-slate-300 hover:text-white border border-white/5'
+                  }`}
               >
                 <span>{cat.icon}</span>
                 <span>{cat.name}</span>
@@ -270,7 +268,7 @@ export default function MoneyPage() {
 
       <FloatingActionButton
         onAddExpense={() => setIsExpenseModalOpen(true)}
-        onUploadMedia={() => {}}
+        onUploadMedia={() => { }}
         onSettleUp={() => setIsSettleModalOpen(true)}
       />
 

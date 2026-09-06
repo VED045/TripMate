@@ -129,6 +129,7 @@ export async function DELETE(req: NextRequest) {
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
     const supabase = createServiceClient();
+
     const { error } = await supabase.from('expenses').delete().eq('id', id);
     if (error) throw error;
     return NextResponse.json({ success: true });

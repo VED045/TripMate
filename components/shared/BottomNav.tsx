@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState } from 'react';
@@ -15,6 +14,7 @@ import {
   BarChart3,
   X,
 } from 'lucide-react';
+import { PwaInstallButton } from '@/components/pwa/PwaInstallButton';
 
 interface BottomNavProps {
   slug: string;
@@ -77,7 +77,9 @@ export function BottomNav({ slug }: BottomNavProps) {
 
   return (
     <>
-      {/* More menu backdrop */}
+      {/* =========================================================
+          MORE MENU BACKDROP
+      ========================================================= */}
       {showMore && (
         <div
           className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
@@ -85,22 +87,28 @@ export function BottomNav({ slug }: BottomNavProps) {
         />
       )}
 
-      {/* More menu */}
+      {/* =========================================================
+          MORE MENU
+      ========================================================= */}
       {showMore && (
         <div className="fixed bottom-[76px] right-3 z-50 md:hidden w-56 rounded-2xl bg-[#0c1228] border border-white/10 shadow-2xl overflow-hidden">
+          {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
             <span className="text-sm font-bold text-white">
               Trip Navigation
             </span>
 
             <button
+              type="button"
               onClick={() => setShowMore(false)}
-              className="p-1.5 rounded-lg bg-white/5 text-slate-400 hover:text-white"
+              aria-label="Close menu"
+              className="p-1.5 rounded-lg bg-white/5 text-slate-400 hover:text-white transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
+          {/* Menu Items */}
           <div className="p-2">
             {moreItems.map((item) => {
               const Icon = item.icon;
@@ -117,17 +125,26 @@ export function BottomNav({ slug }: BottomNavProps) {
                     }`}
                 >
                   <Icon className="w-5 h-5" />
+
                   <span className="text-sm font-semibold">
                     {item.label}
                   </span>
                 </Link>
               );
             })}
+
+            {/* Divider */}
+            <div className="my-2 border-t border-white/10" />
+
+            {/* PWA Install / Update */}
+            <PwaInstallButton />
           </div>
         </div>
       )}
 
-      {/* Bottom Navigation */}
+      {/* =========================================================
+          BOTTOM NAVIGATION
+      ========================================================= */}
       <nav
         aria-label="Mobile Navigation"
         className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-slate-950/90 backdrop-blur-xl border-t border-white/10 px-2 py-1.5 safe-area-bottom shadow-2xl"
@@ -146,6 +163,7 @@ export function BottomNav({ slug }: BottomNavProps) {
                   : 'text-slate-400 hover:text-slate-200'
                   }`}
               >
+                {/* Active indicator */}
                 {item.active && (
                   <span className="absolute -top-1 w-6 h-1 bg-gradient-to-r from-indigo-500 to-cyan-400 rounded-full shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
                 )}
@@ -159,15 +177,20 @@ export function BottomNav({ slug }: BottomNavProps) {
             );
           })}
 
-          {/* More */}
+          {/* =====================================================
+              MORE
+          ===================================================== */}
           <button
             type="button"
             onClick={() => setShowMore((prev) => !prev)}
+            aria-expanded={showMore}
+            aria-label="More navigation options"
             className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all duration-200 relative ${moreActive || showMore
               ? 'text-cyan-400 scale-105'
               : 'text-slate-400 hover:text-slate-200'
               }`}
           >
+            {/* Active indicator */}
             {(moreActive || showMore) && (
               <span className="absolute -top-1 w-6 h-1 bg-gradient-to-r from-indigo-500 to-cyan-400 rounded-full shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
             )}
@@ -183,4 +206,3 @@ export function BottomNav({ slug }: BottomNavProps) {
     </>
   );
 }
-

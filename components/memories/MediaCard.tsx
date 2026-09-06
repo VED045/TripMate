@@ -1,11 +1,11 @@
 'use client';
 
 import React from 'react';
-import { 
-  Heart, 
-  Film, 
-  Download, 
-  Users 
+import {
+  Heart,
+  Film,
+  Download,
+  Users
 } from 'lucide-react';
 import type { MediaWithDetails } from '@/types';
 
@@ -23,21 +23,49 @@ export function MediaCard({
   onDownload,
 }: MediaCardProps) {
   const isVideo = media.media_type === 'video';
-  const displayUrl = media.thumbnail_url || media.url || '';
+  const displayUrl = media.url || media.thumbnail_url || '';
 
   return (
-    <div className="group relative aspect-square rounded-2xl overflow-hidden bg-slate-900 border border-white/10 shadow-lg cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:border-cyan-500/40">
+    <div
+      className="
+      group relative
+      aspect-square
+      min-h-[160px]
+      w-full
+      rounded-2xl
+      overflow-hidden
+      bg-slate-900
+      border border-white/10
+      shadow-lg
+      cursor-pointer
+      transition-all duration-300
+      hover:scale-[1.02]
+      hover:border-cyan-500/40
+    "
+    >
+
       {/* Media image or video preview */}
       {displayUrl ? (
-        <img
-          src={displayUrl}
-          alt={media.filename || 'Trip memory'}
-          loading="lazy"
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          onClick={onClick}
-        />
+        isVideo ? (
+          <video
+            src={displayUrl}
+            muted
+            playsInline
+            preload="metadata"
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            onClick={onClick}
+          />
+        ) : (
+          <img
+            src={displayUrl}
+            alt={media.filename || 'Trip memory'}
+            loading="lazy"
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            onClick={onClick}
+          />
+        )
       ) : (
-        <div 
+        <div
           onClick={onClick}
           className="w-full h-full flex items-center justify-center bg-slate-800 text-slate-500"
         >
@@ -46,7 +74,7 @@ export function MediaCard({
       )}
 
       {/* Overlay gradient */}
-      <div 
+      <div
         onClick={onClick}
         className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200"
       />
@@ -68,11 +96,10 @@ export function MediaCard({
             e.stopPropagation();
             onToggleFavorite(media.id, media.is_favorite);
           }}
-          className={`absolute top-2 right-2 p-1.5 rounded-full backdrop-blur-md transition-transform hover:scale-110 ${
-            media.is_favorite
-              ? 'bg-rose-500/90 text-white shadow-lg shadow-rose-500/30'
-              : 'bg-black/50 text-white/70 hover:text-white border border-white/10'
-          }`}
+          className={`absolute top-2 right-2 p-1.5 rounded-full backdrop-blur-md transition-transform hover:scale-110 ${media.is_favorite
+            ? 'bg-rose-500/90 text-white shadow-lg shadow-rose-500/30'
+            : 'bg-black/50 text-white/70 hover:text-white border border-white/10'
+            }`}
         >
           <Heart className={`w-3.5 h-3.5 ${media.is_favorite ? 'fill-white' : ''}`} />
         </button>

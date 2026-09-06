@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
       .from('timeline_events')
       .select('*')
       .eq('trip_id', tripId)
+      .neq('event_type', 'media_uploaded')
       .order('event_time', { ascending: false });
 
     if (error) throw error;
