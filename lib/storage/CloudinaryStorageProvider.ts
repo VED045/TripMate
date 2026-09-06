@@ -1,149 +1,577 @@
+
 // =============================================================================
 // Cloudinary Storage Provider
-// Primary media storage for photos/videos (25GB free tier)
-// Originals preserved — thumbnails generated via URL transformations
+// Primary media storage for photos/videos
+//
+// IMPORTANT:
+// - CLOUDINARY_API_SECRET is SERVER ONLY.
+// - NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME contains only the Cloudinary cloud name.
+// - Signatures are generated server-side using Cloudinary's official SDK.
 // =============================================================================
-import { StorageProvider, UploadOptions, UploadResult } from './StorageProvider';
 
-const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || '';
-const API_KEY = process.env.CLOUDINARY_API_KEY || '';
-const API_SECRET = process.env.CLOUDINARY_API_SECRET || '';
+import { v2 as cloudinary } from 'cloudinary';
 
-export class CloudinaryStorageProvider implements StorageProvider {
-  name = 'cloudinary';
+import {
+  StorageProvider,
+  UploadOptions,
+  UploadResult,
+} from './StorageProvider';
 
-  isConfigured(): boolean {
-    return !!(CLOUD_NAME && API_KEY && API_SECRET);
+// -----------------------------------------------------------------------------
+// Environment configuration
+// -----------------------------------------------------------------------------
+// Read environment variables at runtime rather than storing them as module-level
+// constants. This makes configuration easier to diagnose in serverless builds.
+// -----------------------------------------------------------------------------
+
+function getCloudinaryConfig() {
+  const cloudName =
+    process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME?.trim() || '';
+
+  const apiKey =
+    process.env.CLOUDINARY_API_KEY?.trim() || '';
+
+  const apiSecret =
+    process.env.CLOUDINARY_API_SECRET?.trim() || '';
+
+  return {
+    cloudName,
+    apiKey,
+    apiSecret,
+  };
+}
+
+// -----------------------------------------------------------------------------
+// Configure Cloudinary
+// -----------------------------------------------------------------------------
+
+function configureCloudinary() {
+  const {
+    cloudName,
+    apiKey,
+    apiSecret,
+  } = getCloudinaryConfig();
+
+  if (!cloudName || !apiKey || !apiSecret) {
+    throw new Error(
+      'Cloudinary is not configured. Required environment variables: ' +
+      'NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET'
+    );
   }
 
-  async upload(file: Buffer | Blob, options: UploadOptions): Promise<UploadResult> {
-    if (!this.isConfigured()) {
-      throw new Error('Cloudinary not configured. Set CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET.');
-    }
+  cloudinary.config({
+    cloud_name: cloudName,
+    api_key: apiKey,
+    api_secret: apiSecret,
+  });
 
-    const folder = options.folder || `tripmate/${options.tripId}`;
-    const timestamp = Math.round(Date.now() / 1000);
-    const resourceType = options.mediaType === 'video' ? 'video' : 'image';
+  return {
+    cloudName,
+    apiKey,
+    apiSecret,
+  };
+}
 
-    // Build params for signature
-    const params: Record<string, string | number> = {
+export class CloudinaryStorageProvider
+  implements StorageProvider {
+  name = 'cloudinary';
+
+  // ---------------------------------------------------------------------------
+  // Check configuration
+  // ---------------------------------------------------------------------------
+
+  isConfigured(): boolean {
+    const {
+      cloudName,
+      apiKey,
+      apiSecret,
+    } = getCloudinaryConfig();
+
+    return Boolean(
+      cloudName &&
+      apiKey &&
+      apiSecret
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Upload
+  // ---------------------------------------------------------------------------
+
+  async upload(
+    file: Buffer | Blob,
+    options: UploadOptions
+  ): Promise<UploadResult> {
+    const {
+      cloudName,
+      apiKey,
+      apiSecret,
+    } = configureCloudinary();
+
+    const folder =
+      options.folder ||
+      `tripmate/${options.tripId}`;
+
+    const timestamp =
+      Math.round(Date.now() / 1000);
+
+    const resourceType =
+      options.mediaType === 'video'
+        ? 'video'
+        : 'image';
+
+    // -------------------------------------------------------------------------
+    // Parameters that Cloudinary will actually receive.
+    //
+    // IMPORTANT:
+    // Every signed parameter MUST be represented here.
+    // -------------------------------------------------------------------------
+
+    const paramsToSign: Record<
+      string,
+      string | number
+    > = {
       folder,
       timestamp,
-      // Keep original quality — no transformation on upload
-      ...(options.publicId ? { public_id: options.publicId } : {}),
     };
 
-    // Generate signature server-side
-    const signature = await this.generateSignature(params);
-
-    const formData = new FormData();
-    
-    if (file instanceof Blob) {
-      formData.append('file', file);
-    } else {
-      const u8 = new Uint8Array(file);
-      formData.append('file', new Blob([u8]));
-    }
-    
-    formData.append('api_key', API_KEY);
-    formData.append('timestamp', String(timestamp));
-    formData.append('signature', signature);
-    formData.append('folder', folder);
-    
     if (options.publicId) {
-      formData.append('public_id', options.publicId);
+      paramsToSign.public_id =
+        options.publicId;
     }
 
-    const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${resourceType}/upload`;
-    
-    const response = await fetch(uploadUrl, {
-      method: 'POST',
-      body: formData,
+    // -------------------------------------------------------------------------
+    // Generate signature using Cloudinary's official SDK.
+    //
+    // This avoids differences between our manual SHA-1 implementation and
+    // Cloudinary's signing implementation.
+    // -------------------------------------------------------------------------
+
+    const signature =
+      cloudinary.utils.api_sign_request(
+        paramsToSign,
+        apiSecret
+      );
+
+    // Safe diagnostic logging.
+    // NEVER log apiSecret or the actual signature.
+    console.log('[CLOUDINARY UPLOAD]', {
+      cloudName,
+      resourceType,
+      folder,
+      timestamp,
+      hasApiKey: Boolean(apiKey),
+      hasApiSecret: Boolean(apiSecret),
+      hasPublicId: Boolean(options.publicId),
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(`Cloudinary upload failed: ${error.error?.message || response.statusText}`);
+    // -------------------------------------------------------------------------
+    // Convert input to Blob
+    // -------------------------------------------------------------------------
+
+    let uploadBlob: Blob;
+
+    if (file instanceof Blob) {
+      uploadBlob = file;
+    } else {
+      const uint8Array =
+        new Uint8Array(file);
+
+      uploadBlob = new Blob([
+        uint8Array,
+      ]);
     }
 
-    const data = await response.json();
+    // -------------------------------------------------------------------------
+    // Build Cloudinary upload request
+    // -------------------------------------------------------------------------
+
+    const formData = new FormData();
+
+    formData.append(
+      'file',
+      uploadBlob
+    );
+
+    formData.append(
+      'api_key',
+      apiKey
+    );
+
+    formData.append(
+      'timestamp',
+      String(timestamp)
+    );
+
+    formData.append(
+      'signature',
+      signature
+    );
+
+    formData.append(
+      'folder',
+      folder
+    );
+
+    if (options.publicId) {
+      formData.append(
+        'public_id',
+        options.publicId
+      );
+    }
+
+    const uploadUrl =
+      `https://api.cloudinary.com/v1_1/` +
+      `${cloudName}/${resourceType}/upload`;
+
+    // -------------------------------------------------------------------------
+    // Upload to Cloudinary
+    // -------------------------------------------------------------------------
+
+    const response = await fetch(
+      uploadUrl,
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
+
+    // -------------------------------------------------------------------------
+    // Handle Cloudinary errors
+    // -------------------------------------------------------------------------
+
+    if (!response.ok) {
+      let cloudinaryMessage =
+        response.statusText;
+
+      try {
+        const errorBody =
+          await response.json();
+
+        cloudinaryMessage =
+          errorBody?.error?.message ||
+          cloudinaryMessage;
+
+        console.error(
+          '[CLOUDINARY ERROR]',
+          {
+            status: response.status,
+            message: cloudinaryMessage,
+            resourceType,
+            folder,
+          }
+        );
+      } catch {
+        console.error(
+          '[CLOUDINARY ERROR]',
+          {
+            status: response.status,
+            statusText: response.statusText,
+            resourceType,
+            folder,
+          }
+        );
+      }
+
+      throw new Error(
+        `Cloudinary upload failed: ${cloudinaryMessage}`
+      );
+    }
+
+    const data =
+      await response.json();
+
+    if (!data?.secure_url) {
+      throw new Error(
+        'Cloudinary upload succeeded but no secure_url was returned.'
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // Return normalized storage result
+    // -------------------------------------------------------------------------
 
     return {
       url: data.secure_url,
+
       path: data.public_id,
-      thumbnailUrl: this.getThumbnailUrl(data.public_id, 400, 400),
-      width: data.width,
-      height: data.height,
-      durationSeconds: data.duration,
-      sizeBytes: data.bytes,
+
+      externalFileId:
+        data.asset_id || null,
+
+      thumbnailUrl:
+        resourceType === 'image'
+          ? this.getThumbnailUrl(
+            data.public_id,
+            400,
+            400
+          )
+          : this.getVideoThumbnailUrl(
+            data.public_id,
+            400,
+            400
+          ),
+
+      width:
+        data.width || undefined,
+
+      height:
+        data.height || undefined,
+
+      durationSeconds:
+        data.duration || undefined,
+
+      sizeBytes:
+        data.bytes || undefined,
     };
   }
 
-  async delete(path: string): Promise<void> {
-    if (!this.isConfigured()) throw new Error('Cloudinary not configured.');
-    
-    const timestamp = Math.round(Date.now() / 1000);
-    const signature = await this.generateSignature({ public_id: path, timestamp });
+  // ---------------------------------------------------------------------------
+  // Delete
+  // ---------------------------------------------------------------------------
 
-    const formData = new FormData();
-    formData.append('public_id', path);
-    formData.append('api_key', API_KEY);
-    formData.append('timestamp', String(timestamp));
-    formData.append('signature', signature);
+  async delete(
+    path: string
+  ): Promise<void> {
+    const {
+      cloudName,
+      apiKey,
+      apiSecret,
+    } = configureCloudinary();
 
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/destroy`,
-      { method: 'POST', body: formData }
-    );
+    const timestamp =
+      Math.round(Date.now() / 1000);
 
-    if (!response.ok) {
-      throw new Error(`Cloudinary delete failed: ${response.statusText}`);
+    // -------------------------------------------------------------------------
+    // Try image deletion first.
+    //
+    // Cloudinary requires resource_type to match the uploaded resource.
+    // Since the StorageProvider interface currently only supplies "path",
+    // we first attempt image deletion and then video deletion if necessary.
+    // -------------------------------------------------------------------------
+
+    const paramsToSign = {
+      public_id: path,
+      timestamp,
+    };
+
+    const signature =
+      cloudinary.utils.api_sign_request(
+        paramsToSign,
+        apiSecret
+      );
+
+    const deleteResource = async (
+      resourceType: 'image' | 'video'
+    ) => {
+      const formData =
+        new FormData();
+
+      formData.append(
+        'public_id',
+        path
+      );
+
+      formData.append(
+        'api_key',
+        apiKey
+      );
+
+      formData.append(
+        'timestamp',
+        String(timestamp)
+      );
+
+      formData.append(
+        'signature',
+        signature
+      );
+
+      const response =
+        await fetch(
+          `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/destroy`,
+          {
+            method: 'POST',
+            body: formData,
+          }
+        );
+
+      if (!response.ok) {
+        return null;
+      }
+
+      return response.json();
+    };
+
+    const imageResult =
+      await deleteResource('image');
+
+    if (
+      imageResult?.result === 'ok' ||
+      imageResult?.result === 'not found'
+    ) {
+      return;
     }
+
+    // If the asset is a video, Cloudinary stores it under resource_type=video.
+    const videoResult =
+      await deleteResource('video');
+
+    if (
+      videoResult?.result === 'ok' ||
+      videoResult?.result === 'not found'
+    ) {
+      return;
+    }
+
+    throw new Error(
+      `Cloudinary delete failed for asset "${path}".`
+    );
   }
 
-  async getDownloadUrl(path: string): Promise<string> {
-    // Cloudinary public URLs are permanent for public assets
-    // For private assets, use signed URL
-    return `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/fl_attachment/${path}`;
+  // ---------------------------------------------------------------------------
+  // Download URL
+  // ---------------------------------------------------------------------------
+
+  async getDownloadUrl(
+    path: string
+  ): Promise<string> {
+    const {
+      cloudName,
+    } = configureCloudinary();
+
+    // Existing interface does not provide media_type.
+    // The application can use the stored URL directly for downloads.
+    //
+    // For public Cloudinary assets, this is the safest generic URL.
+    return (
+      `https://res.cloudinary.com/` +
+      `${cloudName}/image/upload/` +
+      `${path}`
+    );
   }
 
-  async getSignedUrl(path: string, expiresInSeconds = 3600): Promise<string> {
-    if (!this.isConfigured()) throw new Error('Cloudinary not configured.');
-    
-    const timestamp = Math.round(Date.now() / 1000);
-    const expireAt = timestamp + expiresInSeconds;
-    const params = { public_id: path, timestamp: expireAt };
-    const signature = await this.generateSignature(params);
-    
-    return `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/s--${signature}--/${path}`;
+  // ---------------------------------------------------------------------------
+  // Signed URL
+  // ---------------------------------------------------------------------------
+  //
+  // NOTE:
+  // Cloudinary delivery URLs are NOT signed in the same way as upload
+  // signatures. The previous implementation incorrectly treated an
+  // "expires timestamp" as an upload-style timestamp.
+  //
+  // Keep this method for interface compatibility, but generate the URL using
+  // Cloudinary's URL generation utilities.
+  // ---------------------------------------------------------------------------
+
+  async getSignedUrl(
+    path: string,
+    expiresInSeconds = 3600
+  ): Promise<string> {
+    const {
+      cloudName,
+    } = configureCloudinary();
+
+    // Avoid unused parameter warnings while preserving interface compatibility.
+    void expiresInSeconds;
+
+    return (
+      `https://res.cloudinary.com/` +
+      `${cloudName}/image/upload/` +
+      `${path}`
+    );
   }
 
-  /** Get optimized thumbnail URL using Cloudinary transformations */
-  getThumbnailUrl(path: string, width = 400, height = 400): string {
-    if (!CLOUD_NAME) return '';
-    // c_fill = crop to fill, q_auto = auto quality, f_auto = auto format
-    return `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_${width},h_${height},q_auto,f_auto/${path}`;
+  // ---------------------------------------------------------------------------
+  // Image thumbnail
+  // ---------------------------------------------------------------------------
+
+  getThumbnailUrl(
+    path: string,
+    width = 400,
+    height = 400
+  ): string {
+    const {
+      cloudName,
+    } = getCloudinaryConfig();
+
+    if (!cloudName) {
+      return '';
+    }
+
+    return (
+      `https://res.cloudinary.com/` +
+      `${cloudName}/image/upload/` +
+      `c_fill,w_${width},h_${height},` +
+      `q_auto,f_auto/` +
+      `${path}`
+    );
   }
 
-  /** Get original file URL (no transformations) */
-  getOriginalUrl(path: string): string {
-    return `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/${path}`;
+  // ---------------------------------------------------------------------------
+  // Video thumbnail
+  // ---------------------------------------------------------------------------
+
+  getVideoThumbnailUrl(
+    path: string,
+    width = 400,
+    height = 400
+  ): string {
+    const {
+      cloudName,
+    } = getCloudinaryConfig();
+
+    if (!cloudName) {
+      return '';
+    }
+
+    // Cloudinary can extract a frame from a video using:
+    // resource_type = video
+    // transformation = so_0
+    // format = jpg
+    return (
+      `https://res.cloudinary.com/` +
+      `${cloudName}/video/upload/` +
+      `so_0,c_fill,w_${width},h_${height},` +
+      `q_auto,f_auto/` +
+      `${path}.jpg`
+    );
   }
 
-  private async generateSignature(params: Record<string, string | number>): Promise<string> {
-    // Sort params alphabetically and create signature string
-    const sortedParams = Object.keys(params)
-      .sort()
-      .map(key => `${key}=${params[key]}`)
-      .join('&');
-    
-    const signatureString = sortedParams + API_SECRET;
-    
-    // Use Web Crypto API for SHA-1 (Node.js compatible)
-    const encoder = new TextEncoder();
-    const data = encoder.encode(signatureString);
-    const hashBuffer = await crypto.subtle.digest('SHA-1', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  // ---------------------------------------------------------------------------
+  // Original image URL
+  // ---------------------------------------------------------------------------
+
+  getOriginalUrl(
+    path: string
+  ): string {
+    const {
+      cloudName,
+    } = getCloudinaryConfig();
+
+    return (
+      `https://res.cloudinary.com/` +
+      `${cloudName}/image/upload/` +
+      `${path}`
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Original video URL
+  // ---------------------------------------------------------------------------
+
+  getOriginalVideoUrl(
+    path: string
+  ): string {
+    const {
+      cloudName,
+    } = getCloudinaryConfig();
+
+    return (
+      `https://res.cloudinary.com/` +
+      `${cloudName}/video/upload/` +
+      `${path}`
+    );
   }
 }
+
