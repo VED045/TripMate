@@ -1,0 +1,119 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createServiceClient } from '@/lib/supabase/server';
+import { getStorageProvider } from '@/lib/storage';
+
+const MAX_IMAGE_MB = parseInt(process.env.MAX_IMAGE_SIZE_MB || '50');
+const MAX_VIDEO_MB = parseInt(process.env.MAX_VIDEO_SIZE_MB || '500');
+
+export async function POST(req: NextRequest) {
+  try {
+    const formData = await req.formData();
+    const file = formData.get('file') as File;
+    const tripId = formData.get('trip_id') as string;
+    const uploaderId = formData.get('uploader_id') as string | null;
+    const tagMemberIds = JSON.parse(formData.get('tag_member_ids') as string || '[]') as string[];
+    const albumIds = JSON.parse(formData.get('album_ids') as string || '[]') as string[];
+
+    if (!file || !tripId) {
+      return NextResponse.json({ error: 'file and trip_id required' }, { status: 400 });
+    }
+
+    // Validate file type
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+    if (!isImage && !isVideo) {
+      return NextResponse.json({ error: 'Only images and videos are allowed' }, { status: 400 });
+    }
+
+    // Validate file size
+    const sizeMB = file.size / (1024 * 1024);
+    const limit = isVideo ? MAX_VIDEO_MB : MAX_IMAGE_MB;
+    if (sizeMB > limit) {
+      return NextResponse.json(
+        { error: `File too large. Max ${limit}MB for ${isVideo ? 'videos' : 'images'}` },
+        { status: 413 }
+      );
+    }
+
+    // Upload to storage provider
+    const provider = getStorageProvider();
+    if (!provider.isConfigured()) {
+      return NextResponse.json({
+        error: `Storage provider "${provider.name}" is not configured. Check your environment variables.`
+      }, { status: 503 });
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const uploadResult = await provider.upload(buffer, {
+      tripId,
+      folder: `tripmate/${tripId}/${isVideo ? 'videos' : 'photos'}`,
+      filename: file.name,
+      mediaType: isVideo ? 'video' : 'photo',
+      generateThumbnail: true,
+    });
+
+    // Save metadata to database
+    const supabase = createServiceClient();
+    const { data: mediaRecord, error: dbError } = await supabase
+      .from('media')
+      .insert({
+        trip_id: tripId,
+        uploader_id: uploaderId || null,
+        storage_provider: provider.name as 'cloudinary' | 'supabase',
+        storage_path: uploadResult.path,
+        external_file_id: uploadResult.externalFileId || null,
+        filename: uploadResult.path.split('/').pop() || file.name,
+        original_filename: file.name,
+        mime_type: file.type,
+        media_type: isVideo ? 'video' : 'photo',
+        size_bytes: uploadResult.sizeBytes || file.size,
+        width: uploadResult.width || null,
+        height: uploadResult.height || null,
+        duration_seconds: uploadResult.durationSeconds || null,
+        url: uploadResult.url,
+        thumbnail_url: uploadResult.thumbnailUrl || null,
+      })
+      .select()
+      .single();
+
+    if (dbError) throw dbError;
+
+    // Save people tags
+    if (tagMemberIds.length > 0) {
+      await supabase.from('media_tags').insert(
+        tagMemberIds.map(memberId => ({
+          media_id: mediaRecord.id,
+          member_id: memberId,
+          tagged_by: uploaderId || null,
+        }))
+      );
+    }
+
+    // Add to albums
+    if (albumIds.length > 0) {
+      await supabase.from('album_media').insert(
+        albumIds.map(albumId => ({
+          album_id: albumId,
+          media_id: mediaRecord.id,
+          added_by: uploaderId || null,
+        }))
+      );
+    }
+
+    // Timeline event
+    await supabase.from('timeline_events').insert({
+      trip_id: tripId,
+      event_type: 'media_uploaded',
+      title: isVideo ? 'Video uploaded' : 'Photo uploaded',
+      icon: isVideo ? '🎬' : '📸',
+      color: '#8b5cf6',
+      media_id: mediaRecord.id,
+    });
+
+    return NextResponse.json(mediaRecord, { status: 201 });
+  } catch (err: unknown) {
+    console.error('[POST /api/media/upload]', err);
+    const message = err instanceof Error ? err.message : 'Upload failed';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
