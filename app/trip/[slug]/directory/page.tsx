@@ -162,15 +162,108 @@ export default function DirectoryPage() {
     toast.success('Copied to clipboard!');
   };
 
-  const handleSendLocationPing = (contact: TripContact) => {
-    const msg = `Hi ${contact.name} 👋! Safety check-in from ${trip?.name || 'our trip'}: I'm safe & sound! 📍 Location Status: Checked in safely.`;
+  const handleSendLocationPing = async (contact: TripContact) => {
+    const loadingToast = toast.loading(`Fetching current location & nearby area for ${contact.name}...`);
+
+    let locationArea = '';
+    let mapsLink = '';
+    let coordsText = '';
+
+    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 7000,
+            maximumAge: 30000,
+          });
+        });
+
+        const { latitude: lat, longitude: lng } = position.coords;
+        mapsLink = `https://maps.google.com/?q=${lat},${lng}`;
+        coordsText = `${lat.toFixed(4)}°, ${lng.toFixed(4)}°`;
+
+        // Reverse geocode via OpenStreetMap Nominatim API
+        try {
+          const geoRes = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
+            { headers: { 'Accept-Language': 'en' } }
+          );
+          if (geoRes.ok) {
+            const geoData = await geoRes.json();
+            const addr = geoData.address || {};
+            const areaName =
+              addr.suburb ||
+              addr.neighbourhood ||
+              addr.residential ||
+              addr.city_district ||
+              addr.town ||
+              addr.city ||
+              addr.village;
+            const cityName = addr.city || addr.town || addr.county || addr.state;
+
+            if (areaName && cityName && areaName !== cityName) {
+              locationArea = `${areaName}, ${cityName}`;
+            } else if (areaName || cityName) {
+              locationArea = areaName || cityName;
+            }
+          }
+        } catch (e) {
+          console.warn('Reverse geocoding warning:', e);
+        }
+      } catch (e) {
+        console.warn('Geolocation error or permission denied:', e);
+      }
+    }
+
+    toast.dismiss(loadingToast);
+
+    let msg = `Hi ${contact.name} 👋! 📍 Safety Location Ping for ${trip?.name || 'our trip'}:\n`;
+    if (locationArea) {
+      msg += `Currently near: *${locationArea}* (${coordsText})\n`;
+    } else if (coordsText) {
+      msg += `GPS Coordinates: *${coordsText}*\n`;
+    } else {
+      msg += `Status: Safe & checked in!\n`;
+    }
+
+    if (mapsLink) {
+      msg += `🗺️ Google Maps Location: ${mapsLink}\n`;
+    }
+
+    msg += `All safe and sound! 💓`;
+
     const url = formatWhatsAppUrl(contact.phone, msg);
     window.open(url, '_blank');
     toast.success(`Location ping sent to ${contact.name}!`);
   };
 
-  const handleSendHeartbeat = (contact: TripContact) => {
-    const msg = `💓 SAFETY HEARTBEAT CHECK-IN: Hi ${contact.name}! All safe & well here on ${trip?.name || 'TripMate'} with the crew! 🎉`;
+  const handleSendHeartbeat = async (contact: TripContact) => {
+    let locationArea = '';
+    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            timeout: 5000,
+            maximumAge: 60000,
+          });
+        });
+        const { latitude: lat, longitude: lng } = position.coords;
+        const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+        if (geoRes.ok) {
+          const geoData = await geoRes.json();
+          const addr = geoData.address || {};
+          locationArea = addr.suburb || addr.town || addr.city || addr.county || '';
+        }
+      } catch {}
+    }
+
+    let msg = `💓 SAFETY HEARTBEAT CHECK-IN: Hi ${contact.name}! All safe & well here on ${trip?.name || 'our trip'}`;
+    if (locationArea) {
+      msg += ` near *${locationArea}*`;
+    }
+    msg += `! Love you! 🎉`;
+
     const url = formatWhatsAppUrl(contact.phone, msg);
     window.open(url, '_blank');
     toast.success(`Heartbeat check-in sent to ${contact.name}!`);
