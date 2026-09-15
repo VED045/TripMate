@@ -15,6 +15,7 @@ export interface Trip {
   cover_image_path: string | null;
   currency: string;
   access_code: string | null;
+  whatsapp_link?: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -26,6 +27,8 @@ export interface Member {
   name: string;
   avatar_url: string | null;
   upi_id: string | null;
+  phone?: string | null;
+  qr_code_url?: string | null;
   is_admin: boolean;
   color: string | null;
   created_at: string;
@@ -47,8 +50,13 @@ export interface Expense {
   trip_id: string;
   title: string;
   amount_paise: number;
+  subtotal_paise: number | null;     // pre-GST total (itemized)
+  gst_rate_percent: number | null;   // e.g. 5, 12, 18
+  gst_amount_paise: number | null;   // GST in paise
+  gst_type: 'exclusive' | 'inclusive' | null;
+  discount_paise: number | null;
   paid_by: string;
-  split_type: 'equal' | 'exact' | 'percentage' | 'shares';
+  split_type: 'equal' | 'exact' | 'percentage' | 'shares' | 'itemized' | 'custom';
   category_id: string | null;
   note: string | null;
   expense_date: string;
@@ -57,6 +65,44 @@ export interface Expense {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ExpenseItem {
+  id: string;
+  expense_id: string;
+  name: string;
+  quantity: number;
+  unit_price_paise: number;
+  total_price_paise: number;
+  gst_rate_percent: number | null;
+  sort_order: number;
+  created_at: string;
+  // Enriched
+  assignments?: ExpenseItemAssignment[];
+}
+
+export interface ExpenseItemAssignment {
+  id: string;
+  expense_item_id: string;
+  member_id: string;
+  quantity: number;
+  amount_paise: number;
+  created_at: string;
+  member?: Member;
+}
+
+export interface ExpenseParticipant {
+  id: string;
+  expense_id: string;
+  member_id: string;
+  base_amount_paise: number;
+  gst_amount_paise: number;
+  total_amount_paise: number;
+  paid_paise: number;
+  status: 'pending' | 'partial' | 'settled';
+  created_at: string;
+  updated_at: string;
+  member?: Member;
 }
 
 export interface ExpenseSplit {
@@ -79,13 +125,40 @@ export interface Settlement {
   note: string | null;
   settled_at: string;
   recorded_by: string | null;
+  status: 'pending' | 'payment_initiated' | 'proof_submitted' | 'verified' | 'rejected';
+  proof_url: string | null;
+  payment_method: 'upi' | 'cash' | 'bank_transfer' | 'other';
+  verified_by: string | null;
+  verified_at: string | null;
   created_at: string;
+  // Enriched
+  from_member?: Member;
+  to_member?: Member;
 }
 
+/** SimplifiedDebt — from the settlements API (snake_case, matches DB) */
 export interface SimplifiedDebt {
-  fromMemberId: string;
-  toMemberId: string;
-  amountPaise: number;
+  from_member_id: string;
+  to_member_id: string;
+  amount_paise: number;
+  // Also supported camelCase for engine internal use
+  fromMemberId?: string;
+  toMemberId?: string;
+  amountPaise?: number;
+}
+
+export interface PaymentProof {
+  id: string;
+  settlement_id: string;
+  uploader_id: string | null;
+  storage_provider: string;
+  storage_path: string;
+  url: string;
+  ocr_amount_paise: number | null;
+  ocr_transaction_id: string | null;
+  confirmed_amount_paise: number | null;
+  confirmed_transaction_id: string | null;
+  created_at: string;
 }
 
 export interface Media {
@@ -163,6 +236,8 @@ export interface ExpenseWithDetails extends Expense {
   paid_by_member: Member;
   splits: (ExpenseSplit & { member: Member })[];
   category: Category | null;
+  items?: ExpenseItem[];
+  participants?: ExpenseParticipant[];
 }
 
 export interface MediaWithDetails extends Media {
@@ -205,12 +280,36 @@ export interface CreateExpenseInput {
   title: string;
   amount_rupees: number; // UI uses rupees, converted to paise server-side
   paid_by: string;
-  split_type: 'equal' | 'exact' | 'percentage' | 'shares';
+  split_type: 'equal' | 'exact' | 'percentage' | 'shares' | 'itemized' | 'custom';
   participant_ids: string[];
   splits?: { member_id: string; value: number }[]; // for non-equal splits
+  // Itemized split fields
+  items?: {
+    name: string;
+    quantity: number;
+    unit_price_rupees: number;
+    gst_rate_percent?: number;
+    assignments: { member_id: string; quantity: number }[];
+  }[];
+  // GST fields
+  gst_rate_percent?: number;
+  gst_type?: 'exclusive' | 'inclusive';
+  discount_rupees?: number;
+  // Common
   category_id?: string;
   note?: string;
   expense_date?: string;
+}
+
+/** Form state for the itemized split editor */
+export interface ItemFormRow {
+  id: string; // local UI key
+  name: string;
+  quantity: number;
+  unitPriceRupees: number;
+  gstRatePercent: number;
+  // who gets this item
+  assignments: { memberId: string; quantity: number }[];
 }
 
 export interface CreateSettlementInput {

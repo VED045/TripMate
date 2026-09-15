@@ -28,6 +28,8 @@ import { FloatingActionButton } from '@/components/shared/FloatingActionButton';
 import type { MediaWithDetails, Album } from '@/types';
 import { toast } from 'sonner';
 
+import { CustomSelect } from '@/components/ui/CustomSelect';
+
 export default function MemoriesPage() {
   const { trip, members, currentMember, refreshTrip } = useActiveTrip();
 
@@ -145,7 +147,7 @@ export default function MemoriesPage() {
   });
 
   return (
-    <div className="flex-1 flex flex-col bg-[#050711]">
+    <div className="flex-1 flex flex-col">
       <TripHeader title="Trip Memories & Cloud Vault" subtitle="Original quality photos & 4K videos" />
 
       <main className="max-w-7xl mx-auto w-full px-4 md:px-6 py-6 space-y-6">
@@ -157,10 +159,10 @@ export default function MemoriesPage() {
           />
         )}
 
-        {/* Top Filter & Action Bar */}
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        {/* Top Filter & Action Bar — Contained Neumorphic Panel */}
+        <div className="raised-card bg-[var(--surface-raised)] border border-[var(--border)] p-3 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-3">
           {/* Tabs */}
-          <div className="flex items-center gap-1.5 p-1 rounded-2xl glass-panel overflow-x-auto max-w-full scrollbar-none">
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none flex-1 min-w-0 py-0.5">
             {[
               { key: 'all', label: `All (${mediaList.length})`, icon: Sparkles },
               { key: 'photos', label: 'Photos', icon: ImageIcon },
@@ -170,10 +172,13 @@ export default function MemoriesPage() {
             ].map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
-                onClick={() => setActiveTab(key as any)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap ${activeTab === key
-                    ? 'bg-gradient-to-r from-cyan-500 to-indigo-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+                onClick={(e) => {
+                  setActiveTab(key as any);
+                  (e.currentTarget as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                }}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap ${activeTab === key
+                    ? 'bg-[#2b56ff] text-white font-extrabold shadow-md shadow-[#2b56ff]/25 border border-transparent'
+                    : 'text-[var(--text-primary)] hover:bg-[var(--surface-inset)] font-bold'
                   }`}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -182,39 +187,40 @@ export default function MemoriesPage() {
             ))}
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            {/* Tagged Member Filter */}
+          {/* Action Controls — Single Horizontal Line */}
+          <div className="flex items-center gap-2 shrink-0 flex-nowrap overflow-x-auto scrollbar-none">
             {activeTab !== 'albums' && members.length > 0 && (
-              <select
+              <CustomSelect
                 value={selectedTagMember}
-                onChange={(e) => setSelectedTagMember(e.target.value)}
-                className="bg-[#0c1228] border border-white/10 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none"
-              >
-                <option value="all">Everyone&apos;s Media</option>
-                {members.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}&apos;s Media
-                  </option>
-                ))}
-              </select>
+                onChange={setSelectedTagMember}
+                options={[
+                  { value: 'all', label: "Everyone's Media" },
+                  ...members.map((m) => ({ value: m.id, label: `${m.name}'s Media`, color: m.color })),
+                ]}
+                className="w-[130px] sm:w-[150px] shrink-0"
+              />
             )}
 
             <button
               onClick={handleDownloadAll}
               disabled={isDownloadingAll || mediaList.length === 0}
-              className="px-3.5 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs font-semibold text-slate-200 hover:text-white flex items-center gap-1.5 transition-all disabled:opacity-50"
+              className="px-3 py-2 rounded-xl inset-card bg-[var(--surface-inset)] hover:bg-[var(--surface-raised)] border border-[var(--border)] text-xs font-extrabold text-[var(--text-primary)] flex items-center gap-1.5 transition-all disabled:opacity-50 shrink-0"
               title="Download Vault"
             >
-              {isDownloadingAll ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-              <span className="hidden sm:inline">Download All</span>
+              {isDownloadingAll ? (
+                <Loader2 className="w-4 h-4 text-emerald-500 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4 text-emerald-500 stroke-[2.5]" />
+              )}
+              <span className="hidden sm:inline">Download</span>
             </button>
 
             <button
               onClick={() => setIsUploadModalOpen(true)}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 flex items-center gap-1.5 transition-all active:scale-95"
+              className="px-3.5 py-2 rounded-xl bg-[#2b56ff] hover:bg-[#163ecf] text-white font-extrabold text-xs shadow-lg shadow-[#2b56ff]/25 flex items-center gap-1.5 transition-all active:scale-95 shrink-0"
             >
-              <UploadCloud className="w-4 h-4" /> Upload Media
+              <UploadCloud className="w-4 h-4 text-white" />
+              <span>Upload</span>
             </button>
           </div>
         </div>

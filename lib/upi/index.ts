@@ -6,7 +6,7 @@
 export interface UpiPaymentOptions {
   recipientUpiId: string;
   recipientName: string;
-  amountPaise: number;
+  amountPaise?: number;
   note?: string;
   transactionRef?: string;
 }
@@ -36,23 +36,16 @@ export function validateUpiId(upiId: string): UpiValidationResult {
 export function generateUpiPaymentLink(options: UpiPaymentOptions): string {
   const { recipientUpiId, recipientName, amountPaise, note, transactionRef } = options;
   
-  const validation = validateUpiId(recipientUpiId);
-  if (!validation.valid) {
-    // Return standard link even if validation regex fails on unusual bank handles
-  }
-  
-  if (amountPaise <= 0) {
-    throw new Error('Amount must be positive');
-  }
-  
-  const amountRupees = (amountPaise / 100).toFixed(2);
-  
   const params = new URLSearchParams({
     pa: recipientUpiId,
     pn: recipientName,
-    am: amountRupees,
     cu: 'INR',
   });
+  
+  if (amountPaise && amountPaise > 0) {
+    const amountRupees = (amountPaise / 100).toFixed(2);
+    params.set('am', amountRupees);
+  }
   
   if (note) params.set('tn', note);
   if (transactionRef) params.set('tr', transactionRef);
@@ -68,13 +61,13 @@ export function generateUpiDeepLink({
 }: {
   payeeUpiId: string;
   payeeName: string;
-  amountRupees: number;
+  amountRupees?: number;
   note?: string;
 }): string {
   return generateUpiPaymentLink({
     recipientUpiId: payeeUpiId,
     recipientName: payeeName,
-    amountPaise: Math.round(amountRupees * 100),
+    amountPaise: amountRupees && amountRupees > 0 ? Math.round(amountRupees * 100) : undefined,
     note,
   });
 }
@@ -87,18 +80,18 @@ export function generateUpiQrUrl({
 }: {
   payeeUpiId: string;
   payeeName: string;
-  amountRupees: number;
+  amountRupees?: number;
   note?: string;
 }): string {
   const upiUrl = generateUpiDeepLink({ payeeUpiId, payeeName, amountRupees, note });
   return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`;
 }
 
-export function generatePaytmLink(options: { payeeUpiId: string; payeeName: string; amountRupees: number; note?: string }): string {
+export function generatePaytmLink(options: { payeeUpiId: string; payeeName: string; amountRupees?: number; note?: string }): string {
   return generateUpiDeepLink(options);
 }
 
-export function generateGPayLink(options: { payeeUpiId: string; payeeName: string; amountRupees: number; note?: string }): string {
+export function generateGPayLink(options: { payeeUpiId: string; payeeName: string; amountRupees?: number; note?: string }): string {
   return generateUpiDeepLink(options);
 }
 

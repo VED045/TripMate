@@ -69,14 +69,23 @@ export async function PATCH(
     if (body.end_date !== undefined) updateData.end_date = body.end_date;
     if (body.cover_image_url !== undefined) updateData.cover_image_url = body.cover_image_url;
     if (body.access_code !== undefined) updateData.access_code = body.access_code;
+    if (body.whatsapp_link !== undefined) updateData.whatsapp_link = body.whatsapp_link;
     updateData.updated_at = new Date().toISOString();
 
-    const { data, error } = await supabase
-      .from('trips')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    let { data, error } = isUUID
+      ? await supabase.from('trips').update(updateData).eq('id', id).select().single()
+      : await supabase.from('trips').update(updateData).eq('slug', id).select().single();
+
+    // Fallback if whatsapp_link column is not yet in Supabase schema (PGRST204)
+    if (error && (error as any).code === 'PGRST204') {
+      delete updateData.whatsapp_link;
+      const retry = isUUID
+        ? await supabase.from('trips').update(updateData).eq('id', id).select().single()
+        : await supabase.from('trips').update(updateData).eq('slug', id).select().single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) throw error;
     return NextResponse.json(data);
@@ -94,7 +103,11 @@ export async function DELETE(
     const { id } = await params;
     const supabase = createServiceClient();
 
-    const { error } = await supabase.from('trips').delete().eq('id', id);
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const { error } = isUUID
+      ? await supabase.from('trips').delete().eq('id', id)
+      : await supabase.from('trips').delete().eq('slug', id);
+
     if (error) throw error;
 
     return NextResponse.json({ success: true });

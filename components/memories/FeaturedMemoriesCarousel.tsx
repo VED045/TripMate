@@ -41,18 +41,19 @@ export function FeaturedMemoriesCarousel({ mediaList, onOpenViewer }: FeaturedMe
   const displayUrl = current.url || current.thumbnail_url || '';
 
   return (
-    <div className="relative w-full aspect-[21/9] min-h-[220px] max-h-[400px] rounded-3xl overflow-hidden glass-panel border border-white/[0.1] shadow-2xl group select-none">
-      {/* Background Image / Video with motion transition */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={current.id}
-          initial={{ opacity: 0, scale: 1.05 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.6 }}
-          className="absolute inset-0 cursor-pointer"
-          onClick={() => onOpenViewer(currentIndex)}
-        >
+    <div className="relative w-full aspect-[21/9] min-h-[220px] max-h-[400px] rounded-3xl overflow-hidden raised-card bg-[var(--surface-raised)] border border-[var(--border)] p-2 shadow-[var(--shadow-card)] group select-none">
+      <div className="relative w-full h-full rounded-2xl overflow-hidden border border-[var(--border)]">
+        {/* Background Image / Video with motion transition */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={current.id}
+            initial={{ opacity: 0, scale: 1.05 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6 }}
+            className="absolute inset-0 cursor-pointer"
+            onClick={() => onOpenViewer(currentIndex)}
+          >
           {isVideo ? (
             <video
               src={displayUrl}
@@ -169,6 +170,7 @@ export function FeaturedMemoriesCarousel({ mediaList, onOpenViewer }: FeaturedMe
           </button>
         </>
       )}
+      </div>
     </div>
   );
 }

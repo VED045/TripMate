@@ -1,22 +1,24 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
-  LayoutDashboard, 
-  WalletCards, 
-  Camera, 
-  Users, 
-  BarChart3, 
-  Clock, 
-  Settings, 
-  Compass, 
-  Sparkles,
-  ChevronDown,
-  Phone
+import {
+  LayoutDashboard,
+  WalletCards,
+  Camera,
+  Users,
+  Clock,
+  BookUser,
+  BarChart3,
+  Settings,
+  Compass,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
-import { useActiveTrip } from './ActiveTripContext';
+import { cn } from '@/lib/utils';
+import { useActiveTrip } from '@/components/shared/ActiveTripContext';
+import { Avatar } from '@/components/ui/Avatar';
 
 interface SidebarProps {
   slug: string;
@@ -24,144 +26,134 @@ interface SidebarProps {
 
 export function Sidebar({ slug }: SidebarProps) {
   const pathname = usePathname();
-  const { trip, members, currentMember, setCurrentMemberId } = useActiveTrip();
+  const { trip, currentMember } = useActiveTrip();
+  const [collapsed, setCollapsed] = useState(false);
+
+  const base = `/trip/${slug}`;
 
   const navItems = [
-    {
-      label: 'Overview',
-      href: `/trip/${slug}`,
-      icon: LayoutDashboard,
-      active: pathname === `/trip/${slug}`,
-    },
-    {
-      label: 'Money & Split',
-      href: `/trip/${slug}/money`,
-      icon: WalletCards,
-      active: pathname.startsWith(`/trip/${slug}/money`),
-    },
-    {
-      label: 'Memories & Vault',
-      href: `/trip/${slug}/memories`,
-      icon: Camera,
-      active: pathname.startsWith(`/trip/${slug}/memories`),
-    },
-    {
-      label: 'Crew & Balances',
-      href: `/trip/${slug}/people`,
-      icon: Users,
-      active: pathname.startsWith(`/trip/${slug}/people`),
-    },
-    {
-      label: 'Trip Pulse & Stats',
-      href: `/trip/${slug}/analytics`,
-      icon: BarChart3,
-      active: pathname.startsWith(`/trip/${slug}/analytics`),
-    },
-    {
-      label: 'Trip Timeline',
-      href: `/trip/${slug}/timeline`,
-      icon: Clock,
-      active: pathname.startsWith(`/trip/${slug}/timeline`),
-    },
-    {
-      label: 'Directory & SOS',
-      href: `/trip/${slug}/directory`,
-      icon: Phone,
-      active: pathname.startsWith(`/trip/${slug}/directory`),
-    },
-    {
-      label: 'Settings & Export',
-      href: `/trip/${slug}/settings`,
-      icon: Settings,
-      active: pathname.startsWith(`/trip/${slug}/settings`),
-    },
+    { label: 'Dashboard', href: base, icon: LayoutDashboard, exact: true },
+    { label: 'Money', href: `${base}/money`, icon: WalletCards },
+    { label: 'Memories', href: `${base}/memories`, icon: Camera },
+    { label: 'People', href: `${base}/people`, icon: Users },
+    { label: 'Timeline', href: `${base}/timeline`, icon: Clock },
+    { label: 'Analytics', href: `${base}/analytics`, icon: BarChart3 },
+    { label: 'Directory', href: `${base}/directory`, icon: BookUser },
+    { label: 'Settings', href: `${base}/settings`, icon: Settings },
   ];
 
-  return (
-    <aside 
-      aria-label="Desktop Sidebar"
-      className="hidden md:flex flex-col w-64 border-r border-white/[0.08] bg-[#070914]/90 backdrop-blur-3xl p-4 sticky top-0 h-screen z-30 select-none"
-    >
-      {/* Brand */}
-      <div className="mb-6 px-2">
-        <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-cyan-400 via-indigo-600 to-fuchsia-500 p-[1px] shadow-lg shadow-cyan-500/20 group-hover:scale-105 transition-transform">
-            <div className="w-full h-full bg-[#070914] rounded-[15px] flex items-center justify-center">
-              <Compass className="w-5 h-5 text-cyan-400" />
-            </div>
-          </div>
-          <div>
-            <span className="font-outfit font-black text-lg tracking-tight text-white">
-              Trip<span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400">Mate</span>
-            </span>
-            <div className="text-[9px] font-mono tracking-widest text-cyan-400/80 uppercase -mt-0.5">
-              Trip OS
-            </div>
-          </div>
-        </Link>
+  const isActive = (href: string, exact = false) => {
+    if (exact) return pathname === href;
+    return pathname.startsWith(href);
+  };
 
-        {trip && (
-          <div className="mt-4 p-3 rounded-2xl bg-white/[0.03] border border-white/[0.08]">
-            <div className="text-[10px] text-cyan-400 font-mono uppercase tracking-wider font-semibold mb-0.5">Active Trip</div>
-            <div className="font-bold text-slate-100 text-sm truncate">{trip.name}</div>
+  return (
+    <aside
+      className={cn(
+        'hidden md:flex flex-col transition-all duration-300 ease-in-out flex-shrink-0',
+        'border-r border-[var(--border)] relative',
+        collapsed ? 'w-[68px]' : 'w-56'
+      )}
+      style={{ background: 'var(--surface)' }}
+    >
+      {/* Logo / Trip Name */}
+      <div className={cn(
+        'flex items-center gap-3 px-4 py-5 border-b border-[var(--border)]',
+        collapsed && 'px-3 justify-center'
+      )}>
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: 'var(--accent)' }}>
+          <Compass className="w-4 h-4 text-white" />
+        </div>
+        {!collapsed && (
+          <div className="min-w-0">
+            <span className="font-outfit font-black text-sm tracking-tight text-[var(--text-primary)] truncate block">
+              Trip<span style={{ color: 'var(--accent)' }}>Mate</span>
+            </span>
+            {trip && (
+              <span className="text-[10px] text-[var(--text-muted)] truncate block">
+                {trip.name}
+              </span>
+            )}
           </div>
         )}
       </div>
 
-      {/* Member Perspective Switcher */}
-      {members.length > 0 && (
-        <div className="mb-6 px-2">
-          <label className="text-[11px] font-semibold text-slate-400 block mb-1.5 flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Viewing perspective as:
-          </label>
-          <div className="relative">
-            <select
-              aria-label="Select active crew member perspective"
-              value={currentMember?.id || ''}
-              onChange={(e) => setCurrentMemberId(e.target.value)}
-              className="w-full appearance-none bg-white/[0.05] hover:bg-white/[0.08] border border-white/10 rounded-xl px-3 py-2 text-xs font-semibold text-slate-200 focus:outline-none focus:border-cyan-400 transition-colors cursor-pointer pr-8"
-            >
-              {members.map((m) => (
-                <option key={m.id} value={m.id} className="bg-slate-900 text-white">
-                  {m.name} {m.is_admin ? '(Admin)' : ''}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
-        </div>
-      )}
-
-      {/* Nav Links */}
-      <div className="flex-1 space-y-1">
+      {/* Nav Items */}
+      <nav className="flex-1 p-2 overflow-y-auto space-y-0.5">
         {navItems.map((item) => {
           const Icon = item.icon;
+          const active = isActive(item.href, item.exact);
           return (
             <Link
               key={item.label}
               href={item.href}
-              id={`sidebar-link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                item.active
-                  ? 'bg-gradient-to-r from-cyan-500/15 via-indigo-600/20 to-transparent text-cyan-300 border-l-2 border-cyan-400 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
-              }`}
+              title={collapsed ? item.label : undefined}
+              className={cn(
+                'flex items-center gap-3 rounded-xl transition-all duration-150 group relative',
+                collapsed ? 'px-2.5 py-2.5 justify-center' : 'px-3 py-2.5',
+                active
+                  ? 'bg-[var(--accent-subtle)] text-[var(--accent)]'
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--surface-inset)] hover:text-[var(--text-primary)]'
+              )}
             >
-              <Icon className={`w-4 h-4 ${item.active ? 'text-cyan-400' : 'text-slate-500'}`} />
-              <span>{item.label}</span>
+              {/* Active bar */}
+              {active && !collapsed && (
+                <span
+                  className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full"
+                  style={{ background: 'var(--accent)' }}
+                />
+              )}
+              <Icon className={cn('flex-shrink-0 transition-none', collapsed ? 'w-5 h-5' : 'w-4 h-4')} />
+              {!collapsed && (
+                <span className={cn('text-sm truncate', active ? 'font-semibold' : 'font-medium')}>
+                  {item.label}
+                </span>
+              )}
             </Link>
           );
         })}
-      </div>
+      </nav>
 
-      {/* Footer Info */}
-      <div className="pt-4 border-t border-white/[0.08] px-2 flex items-center justify-between text-xs text-slate-500">
-        <span className="flex items-center gap-1.5 text-[11px]">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          Cloudinary Vault
-        </span>
-        <span className="font-mono text-[10px] text-slate-600">v1.0</span>
-      </div>
+      {/* Current Member */}
+      {currentMember && (
+        <div className={cn(
+          'border-t border-[var(--border)] p-3',
+          collapsed ? 'flex justify-center' : 'flex items-center gap-2.5'
+        )}>
+          <Avatar
+            name={currentMember.name}
+            color={currentMember.color}
+            size="sm"
+          />
+          {!collapsed && (
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-[var(--text-primary)] truncate">
+                {currentMember.name}
+              </p>
+              <p className="text-[10px] text-[var(--text-muted)]">Active member</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Collapse toggle */}
+      <button
+        onClick={() => setCollapsed(c => !c)}
+        className={cn(
+          'absolute -right-3 top-7 w-6 h-6 rounded-full flex items-center justify-center',
+          'border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors z-10',
+          'shadow-[var(--shadow-card)]'
+        )}
+        style={{ background: 'var(--surface)' }}
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        {collapsed ? (
+          <ChevronRight className="w-3.5 h-3.5" />
+        ) : (
+          <ChevronLeft className="w-3.5 h-3.5" />
+        )}
+      </button>
     </aside>
   );
 }

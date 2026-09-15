@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,6 +11,7 @@ import {
   Users, 
   UserPlus, 
   Smartphone, 
+  Phone,
   ArrowLeft, 
   ArrowRight, 
   Sparkles,
@@ -19,6 +20,7 @@ import {
   Check
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { pickPhoneContacts, parseVcfContent } from '@/lib/contacts';
 
 const MEMBER_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#f97316', 
@@ -30,6 +32,7 @@ export default function CreateTripPage() {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(false);
+  const vcfInputRef = useRef<HTMLInputElement>(null);
 
   const [tripData, setTripData] = useState({
     name: '',
@@ -39,14 +42,63 @@ export default function CreateTripPage() {
   });
 
   const [members, setMembers] = useState([
-    { name: '', upi_id: '', color: MEMBER_COLORS[0] },
-    { name: '', upi_id: '', color: MEMBER_COLORS[1] },
-    { name: '', upi_id: '', color: MEMBER_COLORS[2] },
+    { name: '', upi_id: '', phone: '', color: MEMBER_COLORS[0] },
+    { name: '', upi_id: '', phone: '', color: MEMBER_COLORS[1] },
+    { name: '', upi_id: '', phone: '', color: MEMBER_COLORS[2] },
   ]);
 
   const addMember = () => {
     const nextColor = MEMBER_COLORS[members.length % MEMBER_COLORS.length];
-    setMembers((m) => [...m, { name: '', upi_id: '', color: nextColor }]);
+    setMembers((m) => [...m, { name: '', upi_id: '', phone: '', color: nextColor }]);
+  };
+
+  const handlePickContacts = async () => {
+    try {
+      const picked = await pickPhoneContacts();
+      if (picked.length > 0) {
+        setMembers((existing) => {
+          const filtered = existing.filter((m) => m.name.trim());
+          const newEntries = picked.map((p, idx) => ({
+            name: p.name,
+            upi_id: '',
+            phone: p.phone || '',
+            color: MEMBER_COLORS[(filtered.length + idx) % MEMBER_COLORS.length],
+          }));
+          return [...filtered, ...newEntries];
+        });
+        toast.success(`Imported ${picked.length} contact(s) into crew!`);
+        return;
+      }
+      vcfInputRef.current?.click();
+    } catch (e) {
+      vcfInputRef.current?.click();
+    }
+  };
+
+  const handleVcfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = reader.result as string;
+      const parsed = parseVcfContent(text);
+      if (parsed.length > 0) {
+        setMembers((existing) => {
+          const filtered = existing.filter((m) => m.name.trim());
+          const newEntries = parsed.map((p, idx) => ({
+            name: p.name,
+            upi_id: '',
+            phone: p.phone || '',
+            color: MEMBER_COLORS[(filtered.length + idx) % MEMBER_COLORS.length],
+          }));
+          return [...filtered, ...newEntries];
+        });
+        toast.success(`Imported ${parsed.length} contact(s) from file!`);
+      } else {
+        toast.error('Could not parse contact file');
+      }
+    };
+    reader.readAsText(file);
   };
 
   const removeMember = (index: number) => {
@@ -233,8 +285,27 @@ export default function CreateTripPage() {
                   Assemble the Crew
                 </h2>
                 <p className="text-xs text-slate-400 mt-1">
-                  Add everyone on the trip with their names and UPI handles.
+                  Add everyone on the trip with their names, phones, and UPI handles.
                 </p>
+              </div>
+
+              {/* Import Contacts Button */}
+              <div>
+                <input
+                  type="file"
+                  ref={vcfInputRef}
+                  onChange={handleVcfUpload}
+                  accept=".vcf,text/vcard"
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={handlePickContacts}
+                  className="w-full py-2.5 px-4 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm"
+                >
+                  <Smartphone className="w-4 h-4 text-cyan-400" />
+                  <span>Import Crew from Phone Contacts / VCF 📱</span>
+                </button>
               </div>
 
               {/* Members input list */}
@@ -272,15 +343,28 @@ export default function CreateTripPage() {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2 pt-1 border-t border-white/5">
-                      <Smartphone className="w-3.5 h-3.5 text-slate-400 ml-1 flex-shrink-0" />
-                      <input
-                        type="text"
-                        placeholder="UPI ID (optional, e.g. alex@okaxis)"
-                        value={member.upi_id}
-                        onChange={(e) => updateMember(idx, 'upi_id', e.target.value)}
-                        className="flex-1 bg-transparent text-xs font-mono text-cyan-300 placeholder-slate-600 focus:outline-none"
-                      />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1.5 border-t border-white/5">
+                      <div className="flex items-center gap-2 bg-white/[0.03] px-2.5 py-1.5 rounded-lg border border-white/5">
+                        <Phone className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                        <input
+                          type="tel"
+                          placeholder="Phone number (optional)"
+                          value={member.phone || ''}
+                          onChange={(e) => updateMember(idx, 'phone', e.target.value)}
+                          className="w-full bg-transparent text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-2 bg-white/[0.03] px-2.5 py-1.5 rounded-lg border border-white/5">
+                        <Smartphone className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                        <input
+                          type="text"
+                          placeholder="UPI ID (optional)"
+                          value={member.upi_id || ''}
+                          onChange={(e) => updateMember(idx, 'upi_id', e.target.value)}
+                          className="w-full bg-transparent text-xs font-mono text-cyan-300 placeholder-slate-600 focus:outline-none"
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}

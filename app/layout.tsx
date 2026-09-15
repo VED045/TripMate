@@ -3,19 +3,19 @@ import './globals.css';
 import { Toaster } from 'sonner';
 
 export const metadata: Metadata = {
-  title: 'TripMate — Your Trip OS',
-  description: 'A premium shared operating system for your trip. Track expenses, share memories, and settle up with your crew.',
-  keywords: ['trip', 'travel', 'expenses', 'photos', 'friends', 'split bills'],
+  title: 'TripMate — Group Travel & Expense OS',
+  description: 'Premium mobile-first travel companion. Split expenses, track payments, share memories, and settle up with UPI — all in one place.',
+  keywords: ['trip', 'travel', 'expenses', 'split bills', 'UPI', 'photos', 'friends', 'group travel'],
   authors: [{ name: 'TripMate' }],
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
+    statusBarStyle: 'default',
     title: 'TripMate',
   },
   openGraph: {
-    title: 'TripMate',
-    description: 'Your premium trip management app',
+    title: 'TripMate — Group Travel & Expense OS',
+    description: 'Split expenses, share memories, settle with UPI.',
     type: 'website',
   },
 };
@@ -24,18 +24,34 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
-  themeColor: '#08080f',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f0f2f5' },
+    { media: '(prefers-color-scheme: dark)', color: '#0c0e1a' },
+  ],
 };
+
+// Inline script to apply theme before first paint (prevents flash)
+const themeScript = `
+(function() {
+  try {
+    var saved = localStorage.getItem('tripmate_theme');
+    var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var theme = saved === 'light' ? 'light' : saved === 'dark' ? 'dark' : (prefersDark ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  } catch(e) {}
+})();
+`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
       </head>
       <body>
@@ -44,12 +60,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           position="top-center"
           expand={false}
           richColors
-          theme="dark"
           toastOptions={{
             style: {
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border-strong)',
+              background: 'var(--surface-raised)',
+              border: '1px solid var(--border)',
               color: 'var(--text-primary)',
+              boxShadow: 'var(--shadow-card)',
             },
           }}
         />

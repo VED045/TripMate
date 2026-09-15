@@ -1,30 +1,35 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
-  X,
   Wallet,
-  Upload,
   Receipt,
-  Users,
-  Check,
   Percent,
   Divide,
-  PieChart as PieIcon,
   Layers,
-  Utensils,
-  Car,
-  Hotel,
-  Sparkles,
-  ShoppingBag,
-  Ticket,
-  Tag
+  Tag,
+  List,
 } from 'lucide-react';
-import type { Member, Category } from '@/types';
+import { BottomSheet } from '@/components/ui/BottomSheet';
+import { GradientButton } from '@/components/ui/Button';
+import { Avatar } from '@/components/ui/Avatar';
+import { ItemizedSplitEditor } from '@/components/money/ItemizedSplitEditor';
+import type { Member, Category, ItemFormRow } from '@/types';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
+// =============================================================================
+// Split type config
+// =============================================================================
+type SplitType = 'equal' | 'exact' | 'percentage' | 'shares' | 'itemized';
 
+const SPLIT_TYPES: { type: SplitType; label: string; short: string; icon: React.ElementType; description: string }[] = [
+  { type: 'equal', label: 'Equal', short: '÷', icon: Divide, description: 'Divided equally among participants' },
+  { type: 'exact', label: 'Exact ₹', short: '₹', icon: Wallet, description: 'Set exact rupee amounts per person' },
+  { type: 'percentage', label: 'Percent', short: '%', icon: Percent, description: 'Percentage of total per person' },
+  { type: 'shares', label: 'Shares', short: '×', icon: Layers, description: 'Weighted share ratio splitting' },
+  { type: 'itemized', label: 'Itemized', short: '📋', icon: List, description: 'Item-by-item assignment with GST' },
+];
 
 interface ExpenseFormModalProps {
   isOpen: boolean;
@@ -45,93 +50,98 @@ export function ExpenseFormModal({
   currentMemberId,
   onSuccess,
 }: ExpenseFormModalProps) {
-
-
   const activeCategories = categories ?? [];
 
+  // Form state
   const [title, setTitle] = useState('');
   const [amountRupees, setAmountRupees] = useState('');
-  const [paidBy, setPaidBy] = useState(currentMemberId || (members[0]?.id ?? ''));
-  const [splitType, setSplitType] = useState<'equal' | 'exact' | 'percentage' | 'shares'>('equal');
-  const [selectedMembers, setSelectedMembers] = useState<string[]>(members.map((m) => m.id));
-  const [customSplits, setCustomSplits] = useState<{ [memberId: string]: string }>({});
-  const [categoryId, setCategoryId] = useState<string>('');
+  const [paidBy, setPaidBy] = useState(currentMemberId || members[0]?.id || '');
+  const [splitType, setSplitType] = useState<SplitType>('equal');
+  const [selectedMembers, setSelectedMembers] = useState<string[]>(members.map(m => m.id));
+  const [customSplits, setCustomSplits] = useState<{ [id: string]: string }>({});
+  const [categoryId, setCategoryId] = useState('');
   const [note, setNote] = useState('');
-  const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Itemized state
+  const [items, setItems] = useState<ItemFormRow[]>([]);
+  const [gstType, setGstType] = useState<'exclusive' | 'inclusive'>('exclusive');
+
+  // Set default category on load
   useEffect(() => {
-    if (
-      activeCategories.length > 0 &&
-      !activeCategories.some((category) => category.id === categoryId)
-    ) {
+    if (activeCategories.length > 0 && !activeCategories.some(c => c.id === categoryId)) {
       setCategoryId(activeCategories[0].id);
     }
-  }, [activeCategories, categoryId]);
+  }, [activeCategories]);
 
-  if (!isOpen) return null;
-
-  const toggleMember = (memberId: string) => {
-    if (selectedMembers.includes(memberId)) {
-      if (selectedMembers.length > 1) {
-        setSelectedMembers(selectedMembers.filter((id) => id !== memberId));
-      } else {
-        toast.error('At least one member must be in the split');
-      }
-    } else {
-      setSelectedMembers([...selectedMembers, memberId]);
+  // Reset form on open
+  useEffect(() => {
+    if (isOpen) {
+      setTitle('');
+      setAmountRupees('');
+      setSplitType('equal');
+      setSelectedMembers(members.map(m => m.id));
+      setCustomSplits({});
+      setNote('');
+      setExpenseDate(new Date().toISOString().split('T')[0]);
+      setReceiptFile(null);
+      setItems([]);
     }
-  };
+  }, [isOpen, members]);
 
-  const handleCustomSplitChange = (memberId: string, val: string) => {
-    setCustomSplits((prev) => ({ ...prev, [memberId]: val }));
+  // Itemized total
+  const itemizedTotal = items.reduce((s, item) => {
+    const subtotal = item.quantity * item.unitPriceRupees;
+    const gst = (subtotal * item.gstRatePercent) / 100;
+    return s + subtotal + gst;
+  }, 0);
+
+  const effectiveAmount = splitType === 'itemized'
+    ? itemizedTotal
+    : parseFloat(amountRupees || '0');
+
+  const toggleMember = (id: string) => {
+    if (selectedMembers.includes(id)) {
+      if (selectedMembers.length <= 1) {
+        toast.error('At least one member must be in the split');
+        return;
+      }
+      setSelectedMembers(prev => prev.filter(x => x !== id));
+    } else {
+      setSelectedMembers(prev => [...prev, id]);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const amount = parseFloat(amountRupees);
-    if (!title.trim()) {
-      toast.error('Please enter an expense title');
-      return;
-    }
-    if (isNaN(amount) || amount <= 0) {
-      toast.error('Please enter a valid amount');
-      return;
-    }
-    if (selectedMembers.length === 0) {
-      toast.error('Select at least one participant');
-      return;
-    }
-    if (splitType !== 'equal') {
-      const values = selectedMembers.map(
-        (id) => parseFloat(customSplits[id] || '0') || 0
-      );
 
-      if (values.some((value) => value <= 0)) {
-        toast.error('Enter a valid split value for every selected member');
-        return;
+    // Validation
+    if (!title.trim()) { toast.error('Please enter an expense title'); return; }
+    if (splitType !== 'itemized' && (isNaN(effectiveAmount) || effectiveAmount <= 0)) {
+      toast.error('Please enter a valid amount'); return;
+    }
+    if (splitType === 'itemized' && items.length === 0) {
+      toast.error('Add at least one item'); return;
+    }
+    if (selectedMembers.length === 0) { toast.error('Select at least one participant'); return; }
+
+    if (splitType !== 'equal' && splitType !== 'itemized') {
+      const vals = selectedMembers.map(id => parseFloat(customSplits[id] || '0') || 0);
+      if (vals.some(v => v <= 0)) {
+        toast.error('Enter a valid split value for every selected member'); return;
       }
-
       if (splitType === 'exact') {
-        const total = values.reduce((sum, value) => sum + value, 0);
-
-        if (Math.abs(total - amount) > 0.01) {
-          toast.error(
-            `Exact split must total ₹${amount.toFixed(2)}. Currently ₹${total.toFixed(2)}.`
-          );
-          return;
+        const total = vals.reduce((s, v) => s + v, 0);
+        if (Math.abs(total - effectiveAmount) > 0.01) {
+          toast.error(`Exact split must total ₹${effectiveAmount.toFixed(2)}. Currently ₹${total.toFixed(2)}.`); return;
         }
       }
-
       if (splitType === 'percentage') {
-        const total = values.reduce((sum, value) => sum + value, 0);
-
+        const total = vals.reduce((s, v) => s + v, 0);
         if (Math.abs(total - 100) > 0.01) {
-          toast.error(
-            `Percentages must total 100%. Currently ${total.toFixed(1)}%.`
-          );
-          return;
+          toast.error(`Percentages must total 100%. Currently ${total.toFixed(1)}%.`); return;
         }
       }
     }
@@ -139,35 +149,48 @@ export function ExpenseFormModal({
     try {
       setIsSubmitting(true);
 
-      // Prepare custom splits payload
-      let splitsPayload: { member_id: string; value: number }[] | undefined;
-      if (splitType !== 'equal') {
-        splitsPayload = selectedMembers.map((id) => ({
-          member_id: id,
-          value: parseFloat(customSplits[id] || '0') || 0,
-        }));
-      }
-
-      // Handle receipt upload if selected
+      // Receipt upload
       let receipt_url: string | undefined;
       let receipt_path: string | undefined;
-
       if (receiptFile) {
-        const formData = new FormData();
-        formData.append('file', receiptFile);
-        formData.append('trip_id', tripId);
-        formData.append('uploader_id', paidBy);
-
-        const uploadRes = await fetch('/api/media/upload', {
-          method: 'POST',
-          body: formData,
-        });
-
+        const fd = new FormData();
+        fd.append('file', receiptFile);
+        fd.append('trip_id', tripId);
+        fd.append('uploader_id', paidBy);
+        const uploadRes = await fetch('/api/media/upload', { method: 'POST', body: fd });
         if (uploadRes.ok) {
           const uploadData = await uploadRes.json();
           receipt_url = uploadData.media?.[0]?.url;
           receipt_path = uploadData.media?.[0]?.storage_path;
         }
+      }
+
+      // Build payload
+      let splitsPayload: { member_id: string; value: number }[] | undefined;
+      if (splitType !== 'equal' && splitType !== 'itemized') {
+        splitsPayload = selectedMembers.map(id => ({
+          member_id: id,
+          value: parseFloat(customSplits[id] || '0') || 0,
+        }));
+      }
+
+      // Itemized items payload
+      let itemsPayload: object[] | undefined;
+      let gstRatePercent: number | undefined;
+      if (splitType === 'itemized' && items.length > 0) {
+        itemsPayload = items.map(item => ({
+          name: item.name,
+          quantity: item.quantity,
+          unit_price_rupees: item.unitPriceRupees,
+          gst_rate_percent: item.gstRatePercent || undefined,
+          assignments: item.assignments.map(a => ({
+            member_id: a.memberId,
+            quantity: a.quantity,
+          })),
+        }));
+        // If all items share the same GST rate, pass it at expense level too
+        const uniqueRates = [...new Set(items.map(i => i.gstRatePercent))];
+        if (uniqueRates.length === 1) gstRatePercent = uniqueRates[0];
       }
 
       const res = await fetch('/api/expenses', {
@@ -176,16 +199,18 @@ export function ExpenseFormModal({
         body: JSON.stringify({
           trip_id: tripId,
           title: title.trim(),
-          amount_rupees: amount,
+          amount_rupees: splitType === 'itemized' ? itemizedTotal : effectiveAmount,
           paid_by: paidBy,
           split_type: splitType,
           participant_ids: selectedMembers,
           splits: splitsPayload,
+          items: itemsPayload,
+          gst_rate_percent: gstRatePercent,
+          gst_type: splitType === 'itemized' ? gstType : undefined,
           category_id:
             categoryId &&
-              /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(categoryId)
-              ? categoryId
-              : undefined,
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(categoryId)
+              ? categoryId : undefined,
           note: note.trim() || undefined,
           expense_date: expenseDate,
           receipt_url,
@@ -198,11 +223,10 @@ export function ExpenseFormModal({
         throw new Error(err.error || 'Failed to add expense');
       }
 
-      toast.success('Expense added successfully!');
+      toast.success('Expense added!');
       onSuccess();
       onClose();
     } catch (err: unknown) {
-      console.error(err);
       toast.error(err instanceof Error ? err.message : 'Error adding expense');
     } finally {
       setIsSubmitting(false);
@@ -210,217 +234,199 @@ export function ExpenseFormModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md overflow-y-auto">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-lg bg-[#0c1228] border border-white/10 rounded-3xl p-6 shadow-2xl relative my-8"
-      >
-        <div className="flex items-center justify-between pb-4 border-b border-white/10">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-pink-500/20 border border-pink-500/30 flex items-center justify-center text-pink-400 shadow-md">
-              <Wallet className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold font-outfit text-white">Add Trip Expense</h2>
-              <p className="text-xs text-slate-400">Record costs & split automatically</p>
-            </div>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-slate-400 hover:text-white transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-          {/* Amount & Title */}
+    <BottomSheet
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Add Expense"
+      subtitle="Record costs & split automatically"
+      maxHeight="95dvh"
+    >
+      <form onSubmit={handleSubmit} className="p-5 space-y-4 pb-8">
+        {/* Amount — only shown for non-itemized */}
+        {splitType !== 'itemized' ? (
           <div>
-            <label className="text-xs font-semibold text-slate-300 mb-1.5 block">Amount (₹ INR)</label>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] block mb-1.5">
+              Amount (₹ INR)
+            </label>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-extrabold text-cyan-400">₹</span>
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-2xl font-black text-[var(--accent)] pointer-events-none">₹</span>
               <input
                 type="number"
                 step="0.01"
                 placeholder="0.00"
                 value={amountRupees}
-                onChange={(e) => setAmountRupees(e.target.value)}
-                className="w-full bg-white/[0.05] border border-white/10 focus:border-cyan-400 rounded-2xl pl-10 pr-4 py-3 text-2xl font-extrabold font-outfit text-white placeholder-slate-600 focus:outline-none transition-all"
+                onChange={e => setAmountRupees(e.target.value)}
+                className="w-full inset-field pl-10 pr-4 py-3 text-2xl font-extrabold font-outfit"
                 required
                 autoFocus
               />
             </div>
           </div>
+        ) : (
+          <div className="inset-card p-3 flex items-center justify-between">
+            <span className="text-xs text-[var(--text-muted)]">Total (from items)</span>
+            <span className="text-xl font-extrabold font-outfit text-[var(--text-primary)]">
+              ₹{itemizedTotal.toFixed(2)}
+            </span>
+          </div>
+        )}
 
+        {/* Title */}
+        <div>
+          <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] block mb-1.5">
+            Title
+          </label>
+          <input
+            type="text"
+            placeholder="e.g. Seafood Dinner, Petrol, Hotel Stay"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            className="w-full inset-field px-3.5 py-2.5 text-sm"
+            required
+          />
+        </div>
+
+        {/* Paid By + Date */}
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-semibold text-slate-300 mb-1.5 block">Expense Title / Description</label>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] block mb-1.5">Paid By</label>
+            <select
+              value={paidBy}
+              onChange={e => setPaidBy(e.target.value)}
+              className="w-full inset-field px-3 py-2 text-xs"
+            >
+              {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] block mb-1.5">Date</label>
             <input
-              type="text"
-              placeholder="e.g. Seafood Dinner at Beach Shack, Petrol, Villa stay"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-white/[0.05] border border-white/10 focus:border-cyan-400 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none transition-all"
-              required
+              type="date"
+              value={expenseDate}
+              onChange={e => setExpenseDate(e.target.value)}
+              className="w-full inset-field px-3 py-2 text-xs"
             />
           </div>
+        </div>
 
-          {/* Category */}
+        {/* Category */}
+        {activeCategories.length > 0 && (
           <div>
-            <label className="text-xs font-semibold text-slate-300 mb-1.5 block flex items-center gap-1">
-              <Tag className="w-3.5 h-3.5 text-cyan-400" />
+            <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] block mb-1.5">
               Category
             </label>
-
-            <div className="relative">
-              <select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full appearance-none bg-[#0a0f24] border border-white/10 hover:border-white/20 focus:border-cyan-400 rounded-xl px-3.5 py-3 pr-10 text-sm text-white focus:outline-none transition-all cursor-pointer"
-                required
-              >
-                {activeCategories.map((category) => (
-                  <option
-                    key={category.id}
-                    value={category.id}
-                    className="bg-[#0a0f24] text-white"
-                  >
-                    {category.icon} {category.name}
-                  </option>
-                ))}
-              </select>
-
-              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Paid By & Date */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-slate-300 mb-1.5 block">Paid By</label>
-              <select
-                value={paidBy}
-                onChange={(e) => setPaidBy(e.target.value)}
-                className="w-full bg-[#0a0f24] border border-white/10 focus:border-cyan-400 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none transition-all"
-              >
-                {members.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-slate-300 mb-1.5 block">Expense Date</label>
-              <input
-                type="date"
-                value={expenseDate}
-                onChange={(e) => setExpenseDate(e.target.value)}
-                className="w-full bg-[#0a0f24] border border-white/10 focus:border-cyan-400 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none transition-all"
-              />
-            </div>
-          </div>
-
-          {/* Split Mode Selector */}
-          <div>
-            <label className="text-xs font-semibold text-slate-300 mb-1.5 block">Split Method</label>
-            <div className="grid grid-cols-4 gap-1.5 p-1 bg-white/[0.03] border border-white/10 rounded-2xl">
-              {[
-                { type: 'equal' as const, label: 'Equally', icon: Divide },
-                { type: 'exact' as const, label: 'Exact ₹', icon: Wallet },
-                { type: 'percentage' as const, label: 'Percent %', icon: Percent },
-                { type: 'shares' as const, label: 'Shares', icon: Layers },
-              ].map(({ type, label, icon: Icon }) => (
+            <div className="flex gap-1.5 flex-wrap">
+              {activeCategories.map(cat => (
                 <button
+                  key={cat.id}
                   type="button"
-                  key={type}
-                  onClick={() => setSplitType(type)}
-                  className={`py-2 px-1 rounded-xl text-xs font-medium flex flex-col items-center gap-1 transition-all ${splitType === type
-                    ? 'bg-gradient-to-r from-cyan-500 to-indigo-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
-                    }`}
+                  onClick={() => setCategoryId(cat.id)}
+                  className={cn(
+                    'flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-medium border transition-all',
+                    categoryId === cat.id
+                      ? 'border-[var(--accent)] bg-[var(--accent-subtle)] text-[var(--accent)]'
+                      : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--border-strong)]'
+                  )}
                 >
-                  <Icon className="w-3.5 h-3.5" />
-                  <span className="text-[10px] font-semibold">{label}</span>
+                  <span>{cat.icon}</span>
+                  <span>{cat.name}</span>
                 </button>
               ))}
             </div>
           </div>
+        )}
 
-          {/* Members Involved */}
+        {/* Split Type */}
+        <div>
+          <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] block mb-1.5">
+            Split Method
+          </label>
+          <div className="grid grid-cols-5 gap-1 p-1 rounded-2xl" style={{ background: 'var(--surface-inset)', boxShadow: 'var(--shadow-inset)' }}>
+            {SPLIT_TYPES.map(({ type, label, icon: Icon }) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setSplitType(type)}
+                className={cn(
+                  'flex flex-col items-center gap-1 py-2 px-1 rounded-xl text-[10px] font-semibold transition-all',
+                  splitType === type
+                    ? 'bg-[var(--surface-raised)] text-[var(--accent)] shadow-[var(--shadow-card)]'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                )}
+                title={type}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{label}</span>
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-[var(--text-muted)] mt-1">
+            {SPLIT_TYPES.find(s => s.type === splitType)?.description}
+          </p>
+        </div>
+
+        {/* Participants (for non-itemized) */}
+        {splitType !== 'itemized' && (
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-slate-300">Split Among</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">
+                Split Among
+              </label>
               <button
                 type="button"
-                onClick={() => setSelectedMembers(members.map((m) => m.id))}
-                className="text-[11px] text-cyan-400 hover:underline font-semibold"
+                onClick={() => setSelectedMembers(members.map(m => m.id))}
+                className="text-[10px] font-semibold text-[var(--accent)] hover:underline"
               >
-                Select Everyone
+                All
               </button>
             </div>
-
-            <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
-              {members.map((m) => {
+            <div className="space-y-1.5 max-h-44 overflow-y-auto">
+              {members.map(m => {
                 const isSelected = selectedMembers.includes(m.id);
+                const shareAmt = isSelected && splitType === 'equal' && effectiveAmount > 0
+                  ? (effectiveAmount / selectedMembers.length).toFixed(2)
+                  : null;
                 return (
                   <div
                     key={m.id}
-                    className={`flex items-center justify-between p-2.5 rounded-xl border transition-all ${isSelected
-                      ? 'bg-white/[0.06] border-cyan-500/40'
-                      : 'bg-white/[0.02] border-white/5 opacity-50'
-                      }`}
+                    className={cn(
+                      'flex items-center justify-between p-2.5 rounded-xl border transition-all',
+                      isSelected
+                        ? 'border-[var(--accent)] bg-[var(--accent-subtle)]'
+                        : 'border-[var(--border)] bg-[var(--surface-inset)] opacity-60'
+                    )}
                   >
                     <button
                       type="button"
                       onClick={() => toggleMember(m.id)}
-                      className="flex items-center gap-2.5 text-left flex-1"
+                      className="flex items-center gap-2 flex-1 text-left"
                     >
-                      <div
-                        className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-sm"
-                        style={{ backgroundColor: m.color || '#6366f1' }}
-                      >
-                        {m.name[0]?.toUpperCase()}
-                      </div>
-                      <span className="text-xs font-medium text-slate-200">{m.name}</span>
+                      <Avatar name={m.name} color={m.color} size="xs" />
+                      <span className={cn('text-xs font-medium', isSelected ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]')}>
+                        {m.name}
+                      </span>
                     </button>
 
                     {isSelected && splitType !== 'equal' && (
                       <div className="flex items-center gap-1">
                         <input
                           type="number"
-                          step={splitType === 'shares' ? '1' : '0.1'}
+                          step={splitType === 'shares' ? '1' : '0.01'}
                           placeholder={splitType === 'percentage' ? '%' : splitType === 'shares' ? '1' : '₹'}
                           value={customSplits[m.id] || ''}
-                          onChange={(e) => handleCustomSplitChange(m.id, e.target.value)}
-                          className="w-16 bg-[#0a0f24] border border-white/15 focus:border-cyan-400 rounded-lg px-2 py-1 text-xs text-right text-white focus:outline-none"
+                          onChange={e => setCustomSplits(prev => ({ ...prev, [m.id]: e.target.value }))}
+                          className="w-16 inset-field px-2 py-1 text-xs text-right font-mono"
+                          onClick={ev => ev.stopPropagation()}
                         />
-                        <span className="text-[10px] text-slate-400 font-mono">
+                        <span className="text-[10px] text-[var(--text-muted)]">
                           {splitType === 'percentage' ? '%' : splitType === 'shares' ? 'sh' : '₹'}
                         </span>
                       </div>
                     )}
 
-                    {isSelected && splitType === 'equal' && (
-                      <span className="text-xs text-cyan-300 font-bold font-mono">
-                        ₹{(parseFloat(amountRupees || '0') / (selectedMembers.length || 1)).toFixed(2)}
+                    {shareAmt && (
+                      <span className="text-xs font-bold font-mono" style={{ color: 'var(--accent)' }}>
+                        ₹{shareAmt}
                       </span>
                     )}
                   </div>
@@ -428,45 +434,60 @@ export function ExpenseFormModal({
               })}
             </div>
           </div>
+        )}
 
-          {/* Receipt Attachment & Note */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-            <div>
-              <label className="text-xs font-semibold text-slate-300 mb-1.5 block">Receipt / Bill Photo (Optional)</label>
-              <label className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-dashed border-white/15 cursor-pointer text-xs text-slate-300 transition-colors">
-                <Receipt className="w-4 h-4 text-cyan-400" />
-                <span className="truncate">{receiptFile ? receiptFile.name : 'Upload bill photo'}</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => e.target.files?.[0] && setReceiptFile(e.target.files[0])}
-                  className="hidden"
-                />
-              </label>
-            </div>
+        {/* Itemized editor */}
+        {splitType === 'itemized' && (
+          <ItemizedSplitEditor
+            members={members}
+            participantIds={selectedMembers}
+            items={items}
+            gstType={gstType}
+            onChange={setItems}
+            onGstTypeChange={setGstType}
+          />
+        )}
 
-            <div>
-              <label className="text-xs font-semibold text-slate-300 mb-1.5 block">Optional Note</label>
-              <input
-                type="text"
-                placeholder="e.g. Paid via credit card"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                className="w-full bg-[#0a0f24] border border-white/10 focus:border-cyan-400 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
-              />
-            </div>
+        {/* Note + Receipt */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] block mb-1.5">Note</label>
+            <input
+              type="text"
+              placeholder="e.g. Paid by credit card"
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              className="w-full inset-field px-3 py-2 text-xs"
+            />
           </div>
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] block mb-1.5">
+              Receipt (optional)
+            </label>
+            <label className="flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-[var(--border-strong)] cursor-pointer text-xs text-[var(--text-secondary)] hover:bg-[var(--surface-inset)] transition-colors">
+              <Receipt className="w-3.5 h-3.5 text-[var(--accent)]" />
+              <span className="truncate">{receiptFile ? receiptFile.name : 'Upload bill photo'}</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={e => e.target.files?.[0] && setReceiptFile(e.target.files[0])}
+                className="hidden"
+              />
+            </label>
+          </div>
+        </div>
 
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full mt-4 py-3.5 rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white font-bold text-sm shadow-xl shadow-pink-500/25 active:scale-[0.99] transition-all disabled:opacity-50"
-          >
-            {isSubmitting ? 'Recording Expense...' : 'Save Expense & Update Balances'}
-          </button>
-        </form>
-      </motion.div>
-    </div>
+        {/* Submit */}
+        <GradientButton
+          type="submit"
+          gradient="rose"
+          size="lg"
+          fullWidth
+          loading={isSubmitting}
+        >
+          {isSubmitting ? 'Recording...' : 'Save Expense & Update Balances'}
+        </GradientButton>
+      </form>
+    </BottomSheet>
   );
 }

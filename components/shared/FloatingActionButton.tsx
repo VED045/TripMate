@@ -118,13 +118,13 @@ export function FloatingActionButton({
         onClick={() => setIsOpen(!isOpen)}
         aria-label={isOpen ? "Close quick actions menu" : "Open quick actions menu"}
         aria-expanded={isOpen}
-        className={`relative z-40 w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center text-white shadow-2xl shadow-cyan-500/30 hover:scale-105 active:scale-95 transition-transform duration-200`}
+        className="relative z-40 w-14 h-14 rounded-2xl bg-[#2b56ff] hover:bg-[#163ecf] flex items-center justify-center text-white shadow-2xl shadow-[#2b56ff]/40 hover:scale-105 active:scale-95 transition-all duration-200"
       >
         <motion.div
           animate={{ rotate: isOpen ? 135 : 0 }}
           transition={{ duration: 0.2 }}
         >
-          <Plus className="w-7 h-7" />
+          <Plus className="w-7 h-7 stroke-[2.5]" />
         </motion.div>
       </button>
     </div>

@@ -9,18 +9,12 @@ import {
   Sparkles, 
   Wallet, 
   Camera, 
-  ShieldCheck, 
   ArrowRight, 
-  Users, 
-  QrCode,
   Flame,
-  Zap,
-  MapPin,
-  ChevronRight
+  Plus,
+  ShieldCheck,
+  QrCode
 } from 'lucide-react';
-import { WaveBackground } from '@/components/shared/WaveBackground';
-import { MountainBackground } from '@/components/shared/MountainBackground';
-import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 
 export default function HomePage() {
@@ -51,9 +45,9 @@ export default function HomePage() {
         toast.success('Joining trip...');
         router.push(`/trip/${cleanSlug}`);
       } else {
-        toast.error('Trip not found. Double check your trip code or URL.');
+        toast.error('Trip not found. Double check your trip code.');
       }
-    } catch (err) {
+    } catch {
       toast.error('Could not connect to server');
     } finally {
       setIsJoining(false);
@@ -61,25 +55,21 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050711] text-slate-100 flex flex-col relative overflow-hidden selection:bg-cyan-500/30 selection:text-cyan-200">
-      {/* Background ambient lighting */}
-      <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-indigo-600/15 blur-[140px] pointer-events-none animate-pulse-glow" />
-      <div className="absolute top-[20%] right-[-10%] w-[45vw] h-[45vw] rounded-full bg-cyan-500/15 blur-[130px] pointer-events-none animate-pulse-glow" />
-      <div className="absolute bottom-[-10%] left-[20%] w-[60vw] h-[40vw] rounded-full bg-fuchsia-600/10 blur-[150px] pointer-events-none" />
-
-      {/* Top Navigation */}
-      <header className="relative z-30 max-w-7xl mx-auto w-full px-6 py-6 flex items-center justify-between">
+    <div className="min-h-screen flex flex-col relative overflow-hidden" style={{ background: 'var(--background)' }}>
+      {/* Top Header */}
+      <header className="relative z-30 max-w-7xl mx-auto w-full px-6 py-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-400 via-indigo-600 to-fuchsia-500 p-[1px] shadow-lg shadow-cyan-500/20">
-            <div className="w-full h-full bg-[#070914] rounded-[15px] flex items-center justify-center">
-              <Compass className="w-5 h-5 text-cyan-400" />
-            </div>
+          <div
+            className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-md"
+            style={{ background: 'linear-gradient(135deg, #2b56ff, #163ecf)' }}
+          >
+            <Compass className="w-5 h-5 text-white" />
           </div>
           <div>
-            <span className="font-outfit font-black text-xl tracking-tight text-white">
-              Trip<span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400">Mate</span>
+            <span className="font-outfit font-black text-xl tracking-tight text-[var(--text-primary)]">
+              Trip<span style={{ color: 'var(--accent)' }}>Mate</span>
             </span>
-            <div className="text-[9px] font-mono tracking-widest text-cyan-400/80 uppercase -mt-1">
+            <div className="text-[9px] font-mono tracking-widest text-[var(--text-muted)] uppercase -mt-0.5">
               Trip Operating System
             </div>
           </div>
@@ -87,22 +77,25 @@ export default function HomePage() {
 
         <Link
           href="/create"
-          className="px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-xs font-semibold text-slate-200 hover:text-white transition-all backdrop-blur-md"
+          className="px-4 py-2 rounded-xl text-white font-bold text-xs shadow-md transition-all active:scale-95 flex items-center gap-1.5"
+          style={{ background: 'linear-gradient(135deg, #2b56ff, #163ecf)' }}
         >
-          New Trip +
+          <Plus className="w-4 h-4" /> Start New Trip
         </Link>
       </header>
 
-      {/* Hero Section */}
-      <main className="relative z-20 flex-1 flex flex-col items-center justify-center px-4 md:px-6 py-12 max-w-5xl mx-auto w-full text-center">
-        {/* Top Feature Pill */}
+      {/* Hero Content */}
+      <main className="relative z-20 flex-1 flex flex-col items-center justify-center px-4 md:px-6 py-10 max-w-5xl mx-auto w-full text-center">
+        {/* Top Feature Badge */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/25 backdrop-blur-xl mb-6 shadow-inner"
+          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-inset)] shadow-[var(--shadow-inset)] mb-6"
         >
-          <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-          <span className="text-xs font-semibold text-cyan-300">Shared OS for Group Trips & Friends</span>
+          <Sparkles className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+          <span className="text-xs font-bold text-[var(--text-secondary)] font-outfit">
+            Next-Gen Group Travel & Financial Operating System
+          </span>
         </motion.div>
 
         {/* Hero Title */}
@@ -110,13 +103,10 @@ export default function HomePage() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          className="text-4xl sm:text-6xl md:text-7xl font-extrabold font-outfit tracking-tight leading-[1.08] max-w-4xl"
+          className="text-4xl sm:text-6xl md:text-7xl font-extrabold font-outfit tracking-tight leading-[1.1] text-[var(--text-primary)] max-w-4xl"
         >
           Travel together. <br className="hidden sm:inline" />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-indigo-300 to-fuchsia-400">
-            Split seamlessly.
-          </span>{' '}
-          Vault memories.
+          <span style={{ color: 'var(--accent)' }}>Split seamlessly.</span> Vault memories.
         </motion.h1>
 
         {/* Subtitle */}
@@ -124,97 +114,102 @@ export default function HomePage() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="text-sm md:text-lg text-slate-400 max-w-2xl mt-4 leading-relaxed font-normal"
+          className="text-sm sm:text-base md:text-lg text-[var(--text-secondary)] max-w-2xl mt-4 leading-relaxed font-normal"
         >
-          Precision expense splitting with 1-tap UPI settlements, high-res original quality photo vault, real-time debt simplification, and dynamic Trip Pulse insights.
+          Precision expense splitting with 1-tap custom UPI QR settlements, zero-compression photo vault, simplified pairwise debts, and dynamic Analytics.
         </motion.p>
 
-        {/* Action Panel */}
+        {/* Action Panel Card */}
         <motion.div
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: 0.3 }}
-          className="w-full max-w-md mt-8 p-3 sm:p-4 rounded-3xl glass-panel relative"
+          className="w-full max-w-md mt-8 p-5 sm:p-6 rounded-3xl raised-card text-left space-y-4"
         >
           <Link
             href="/create"
-            className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-cyan-500 via-indigo-600 to-fuchsia-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-sm shadow-xl shadow-cyan-500/25 flex items-center justify-center gap-2 group transition-all active:scale-[0.99]"
+            className="w-full py-3.5 px-6 rounded-2xl text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2 group transition-all active:scale-[0.98]"
+            style={{ background: 'linear-gradient(135deg, #2b56ff, #163ecf)', boxShadow: '0 8px 25px rgba(43,86,255,0.35)' }}
           >
             <span>Start a New Trip</span>
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </Link>
 
-          <div className="relative flex items-center justify-center my-4">
+          <div className="relative flex items-center justify-center my-3">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-white/10" />
+              <div className="w-full border-t border-[var(--border)]" />
             </div>
-            <span className="relative px-3 bg-[#0c1021] text-[11px] font-semibold text-slate-400 uppercase tracking-widest rounded-full">
-              or join existing trip
+            <span className="relative px-3 bg-[var(--surface-raised)] text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest font-mono">
+              or join an existing trip
             </span>
           </div>
 
-          <form onSubmit={handleJoinTrip} className="flex gap-2">
-            <input
-              type="text"
-              placeholder="e.g. diveagar-boiss-v0ak"
-              value={tripSlug}
-              onChange={(e) => setTripSlug(e.target.value)}
-              className="flex-1 rounded-xl glass-input px-3.5 py-2.5 text-xs text-white placeholder-slate-500 font-mono"
-            />
-            <button
-              type="submit"
-              disabled={isJoining}
-              className="px-4 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.15] border border-white/10 text-xs font-semibold text-white transition-colors"
-            >
-              {isJoining ? 'Joining...' : 'Enter →'}
-            </button>
+          <form onSubmit={handleJoinTrip} className="space-y-2">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] font-mono">
+              Enter Trip Code / Slug
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="e.g. diveagar-boiss-v0ak"
+                value={tripSlug}
+                onChange={(e) => setTripSlug(e.target.value)}
+                className="flex-1 inset-field px-3.5 py-2.5 text-xs font-mono font-semibold text-[var(--text-primary)]"
+              />
+              <button
+                type="submit"
+                disabled={isJoining}
+                className="px-4 py-2.5 rounded-xl bg-[var(--surface-inset)] hover:bg-[var(--surface-raised)] border border-[var(--border)] text-xs font-bold text-[var(--text-primary)] transition-all active:scale-95 disabled:opacity-50"
+              >
+                {isJoining ? 'Joining...' : 'Enter →'}
+              </button>
+            </div>
           </form>
         </motion.div>
 
-        {/* 3 Key Pillars */}
+        {/* 3 Key Feature Cards */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
-          className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl w-full mt-14 text-left"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl w-full mt-12 text-left"
         >
-          <div className="p-5 rounded-2xl glass-panel glass-panel-hover">
-            <div className="w-10 h-10 rounded-xl bg-pink-500/15 border border-pink-500/25 flex items-center justify-center text-pink-400 mb-3.5">
+          <div className="raised-card p-5 space-y-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
               <Wallet className="w-5 h-5" />
             </div>
-            <h3 className="font-bold text-sm text-white">Smart Split & UPI Settle</h3>
-            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-              Equal, exact, percentage & shares splits. Greedy algorithm simplifies debts for 1-tap UPI payouts.
+            <h3 className="font-extrabold text-sm text-[var(--text-primary)] font-outfit">Smart Split & Custom UPI</h3>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+              Itemized, percentage & custom splits with instant 1-tap QR code settlements for any custom amount.
             </p>
           </div>
 
-          <div className="p-5 rounded-2xl glass-panel glass-panel-hover">
-            <div className="w-10 h-10 rounded-xl bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center text-cyan-400 mb-3.5">
+          <div className="raised-card p-5 space-y-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
               <Camera className="w-5 h-5" />
             </div>
-            <h3 className="font-bold text-sm text-white">Original Quality Vault</h3>
-            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-              Zero compression high-res photo/video storage with member tagging, themed albums & batch ZIP downloads.
+            <h3 className="font-extrabold text-sm text-[var(--text-primary)] font-outfit">Original Quality Memories</h3>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+              High-res media vault with member filter, auto-scroll previews, and 1-click batch downloads.
             </p>
           </div>
 
-          <div className="p-5 rounded-2xl glass-panel glass-panel-hover">
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center text-indigo-400 mb-3.5">
+          <div className="raised-card p-5 space-y-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center">
               <Flame className="w-5 h-5" />
             </div>
-            <h3 className="font-bold text-sm text-white">Live Trip Pulse AI</h3>
-            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-              Real-time group stats, spend leaderboard, spending velocity graphs, and fun trip superlatives.
+            <h3 className="font-extrabold text-sm text-[var(--text-primary)] font-outfit">Trip Analytics & Pulse</h3>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+              Spending velocity graphs, member spending stats, category breakdown, and full timeline log.
             </p>
           </div>
         </motion.div>
       </main>
 
-      {/* Horizon Art at bottom */}
-      <div className="relative w-full h-36 mt-auto pointer-events-none opacity-40">
-        <WaveBackground className="absolute inset-0" />
-        <MountainBackground className="absolute bottom-0 left-0 right-0 h-28" />
-      </div>
+      {/* Footer */}
+      <footer className="relative z-20 py-6 text-center text-xs text-[var(--text-muted)] border-t border-[var(--border)] mt-auto">
+        <p className="font-mono">TripMate © 2026 · Group Travel & Financial OS</p>
+      </footer>
     </div>
   );
 }

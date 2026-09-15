@@ -44,7 +44,18 @@ export async function GET(req: NextRequest) {
     }));
 
     const balances = calculateNetBalances(expenseData, settlementData);
-    const simplifiedDebts = simplifyDebts(balances);
+    const simplifiedDebtsRaw = simplifyDebts(balances);
+
+    // Return with both snake_case (for frontend) and camelCase (for engine compatibility)
+    const simplifiedDebts = simplifiedDebtsRaw.map(d => ({
+      from_member_id: d.fromMemberId,
+      to_member_id: d.toMemberId,
+      amount_paise: d.amountPaise,
+      // camelCase kept for backwards compat
+      fromMemberId: d.fromMemberId,
+      toMemberId: d.toMemberId,
+      amountPaise: d.amountPaise,
+    }));
 
     return NextResponse.json({
       balances,

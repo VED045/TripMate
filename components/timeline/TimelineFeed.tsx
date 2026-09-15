@@ -40,12 +40,12 @@ export function TimelineFeed({ events, onAddMoment }: TimelineFeedProps) {
   };
 
   return (
-    <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-white/10">
+    <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-[var(--border)]">
       {events.map((event) => (
         <div key={event.id} className="relative group">
           {/* Timeline Dot / Icon */}
           <div
-            className="absolute -left-6 top-1 w-6 h-6 rounded-full bg-slate-900 border border-white/20 flex items-center justify-center text-xs shadow-md transition-transform group-hover:scale-110"
+            className="absolute -left-6 top-1 w-6 h-6 rounded-full raised-card bg-[var(--surface-raised)] border border-[var(--border)] flex items-center justify-center text-xs shadow-md transition-transform group-hover:scale-110"
             style={{ borderColor: event.color || undefined }}
           >
             {event.icon ? (
@@ -56,12 +56,12 @@ export function TimelineFeed({ events, onAddMoment }: TimelineFeedProps) {
           </div>
 
           {/* Event Content Box */}
-          <div className="rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/10 p-4 transition-all duration-200">
+          <div className="rounded-2xl raised-card bg-[var(--surface-raised)] hover:bg-[var(--surface-raised)] border border-[var(--border)] p-4 transition-all duration-200">
             <div className="flex items-center justify-between gap-2">
-              <h4 className="text-sm font-bold text-white tracking-tight">
+              <h4 className="text-sm font-bold text-[var(--text-primary)] tracking-tight">
                 {event.title}
               </h4>
-              <span className="text-[11px] text-slate-400 font-mono">
+              <span className="text-[11px] text-[var(--text-muted)] font-mono">
                 {new Date(event.event_time).toLocaleDateString('en-IN', {
                   month: 'short',
                   day: 'numeric',
@@ -72,7 +72,7 @@ export function TimelineFeed({ events, onAddMoment }: TimelineFeedProps) {
             </div>
 
             {event.description && (
-              <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+              <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
                 {event.description}
               </p>
             )}

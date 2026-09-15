@@ -47,10 +47,11 @@ export async function POST(req: NextRequest) {
     // Create members
     const memberInserts = (members || [])
       .filter((m: { name: string }) => m.name?.trim())
-      .map((m: { name: string; upi_id?: string }, i: number) => ({
+      .map((m: { name: string; upi_id?: string; phone?: string }, i: number) => ({
         trip_id: tripData.id,
         name: m.name.trim(),
         upi_id: m.upi_id?.trim() || null,
+        phone: m.phone?.trim() || null,
         is_admin: i === 0, // First member is admin
         color: generateColor(),
       }));

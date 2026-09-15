@@ -2,7 +2,6 @@ import React from 'react';
 import { ActiveTripProvider } from '@/components/shared/ActiveTripContext';
 import { Sidebar } from '@/components/shared/Sidebar';
 import { BottomNav } from '@/components/shared/BottomNav';
-import { PwaInstallPrompt } from '@/components/pwa/PwaInstallPrompt';
 import { createServiceClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 
@@ -38,15 +37,24 @@ export default async function TripLayout({
       initialTrip={trip}
       initialMembers={members || []}
     >
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row antialiased selection:bg-cyan-500/30 selection:text-cyan-200">
+      {/* Root shell — uses CSS tokens for background/text, supports light+dark */}
+      <div
+        className="min-h-screen flex flex-col md:flex-row antialiased"
+        style={{
+          background: 'var(--background)',
+          color: 'var(--text-primary)',
+        }}
+      >
+        {/* Desktop sidebar */}
         <Sidebar slug={trip.slug} />
 
-        <div className="flex-1 flex flex-col min-w-0 pb-20 md:pb-8">
+        {/* Main content area */}
+        <main className="flex-1 flex flex-col min-w-0 pb-nav overflow-x-hidden">
           {children}
-        </div>
+        </main>
 
+        {/* Mobile bottom nav */}
         <BottomNav slug={trip.slug} />
-        <PwaInstallPrompt />
       </div>
     </ActiveTripProvider>
   );

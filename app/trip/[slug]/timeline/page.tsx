@@ -53,19 +53,24 @@ export default function TimelinePage() {
 
       <main className="max-w-4xl mx-auto w-full px-4 md:px-6 py-6 space-y-6">
         {/* Top Header Card */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 rounded-3xl bg-slate-900/80 border border-white/10 backdrop-blur-xl">
-          <div>
-            <h2 className="text-xl font-bold font-outfit text-white flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-amber-400" /> Trip Story Stream
-            </h2>
-            <p className="text-xs text-slate-400 mt-1">
-              Every expense, upload, settlement and memory recorded in real-time
-            </p>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 rounded-3xl raised-card bg-gradient-to-r from-amber-500/10 via-[var(--surface-raised)] to-[var(--surface-raised)] border border-amber-500/30">
+          <div className="flex items-start gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0 shadow-sm">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-xl sm:text-2xl font-extrabold font-outfit text-[var(--text-primary)] flex items-center gap-2">
+                Trip Story Stream
+              </h2>
+              <p className="text-xs font-medium text-[var(--text-secondary)] mt-1 leading-relaxed">
+                Every expense, upload, settlement and memory recorded in real-time
+              </p>
+            </div>
           </div>
 
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs shadow-lg shadow-amber-500/20 flex items-center gap-2 transition-all active:scale-95"
+            className="px-5 py-3 rounded-2xl bg-[#2b56ff] hover:bg-[#163ecf] text-white font-bold text-xs shadow-lg shadow-[#2b56ff]/25 flex items-center gap-2 transition-all active:scale-95 shrink-0"
           >
             <Plus className="w-4 h-4" /> Add Moment
           </button>
