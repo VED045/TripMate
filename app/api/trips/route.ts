@@ -57,7 +57,12 @@ export async function POST(req: NextRequest) {
       }));
 
     if (memberInserts.length > 0) {
-      const { error: memberError } = await supabase.from('members').insert(memberInserts);
+      let { error: memberError } = await supabase.from('members').insert(memberInserts);
+      if (memberError && (memberError.code === 'PGRST204' || memberError.message?.includes('phone'))) {
+        const fallbackInserts = memberInserts.map(({ phone, ...rest }: { phone?: string | null; [key: string]: any }) => rest);
+        const retry = await supabase.from('members').insert(fallbackInserts);
+        memberError = retry.error;
+      }
       if (memberError) throw memberError;
     }
 

@@ -4,7 +4,7 @@ import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { X, UserPlus, Smartphone, Check, Phone, Contact } from 'lucide-react';
 import { toast } from 'sonner';
-import { pickPhoneContacts, parseVcfContent } from '@/lib/contacts';
+import { pickPhoneContacts, parseVcfContent, saveMemberPhone, getMemberPhone } from '@/lib/contacts';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import type { Member } from '@/types';
 
@@ -42,7 +42,7 @@ export function MemberFormModal({
       if (memberToEdit) {
         setName(memberToEdit.name || '');
         setUpiId(memberToEdit.upi_id || '');
-        setPhone(memberToEdit.phone || '');
+        setPhone(getMemberPhone(memberToEdit.id, memberToEdit.phone) || '');
         setSelectedColor(memberToEdit.color || MEMBER_COLORS[0]);
       } else {
         setName('');
@@ -131,6 +131,13 @@ export function MemberFormModal({
         throw new Error(err.error || 'Failed to save member');
       }
 
+      const savedData = await res.json();
+      if (savedData?.id) {
+        saveMemberPhone(savedData.id, phone.trim() || null);
+      } else if (memberToEdit?.id) {
+        saveMemberPhone(memberToEdit.id, phone.trim() || null);
+      }
+
       toast.success(isEditing ? 'Member updated!' : `${name.trim()} added to the crew!`);
       onSuccess();
       onClose();
@@ -184,18 +191,16 @@ export function MemberFormModal({
           </button>
         </div>
 
-        {/* Import from Contacts Trigger */}
-        {!memberToEdit && (
-          <div className="pt-4">
-            <button
-              type="button"
-              onClick={handlePickContact}
-              className="w-full py-2.5 px-3 rounded-xl inset-card bg-[var(--surface-inset)] hover:bg-[var(--surface-raised)] border border-[var(--border)] text-[var(--text-primary)] font-extrabold text-xs flex items-center justify-center gap-2 transition-all shadow-inner font-outfit"
-            >
-              <Contact className="w-4 h-4 text-[#2b56ff]" /> Import from Phone Contacts / VCF 📱
-            </button>
-          </div>
-        )}
+        {/* Import from Contacts Trigger (Always accessible during Add and Edit mode) */}
+        <div className="pt-4">
+          <button
+            type="button"
+            onClick={handlePickContact}
+            className="w-full py-2.5 px-3 rounded-xl inset-card bg-[var(--surface-inset)] hover:bg-[var(--surface-raised)] border border-[var(--border)] text-[var(--text-primary)] font-extrabold text-xs flex items-center justify-center gap-2 transition-all shadow-inner font-outfit"
+          >
+            <Contact className="w-4 h-4 text-[#2b56ff]" /> Import from Phone Contacts / VCF 📱
+          </button>
+        </div>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <div>

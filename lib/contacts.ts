@@ -88,6 +88,36 @@ export function getCleanWhatsAppPhone(phone?: string | null): string | null {
 }
 
 /**
+ * Save member phone number to client localStorage fallback
+ */
+export function saveMemberPhone(memberId: string, phone: string | null) {
+  if (typeof window === 'undefined' || !memberId) return;
+  try {
+    const stored = JSON.parse(localStorage.getItem('tripmate_member_phones') || '{}');
+    if (phone) {
+      stored[memberId] = phone;
+    } else {
+      delete stored[memberId];
+    }
+    localStorage.setItem('tripmate_member_phones', JSON.stringify(stored));
+  } catch {}
+}
+
+/**
+ * Get member phone number from direct property or client localStorage fallback
+ */
+export function getMemberPhone(memberId: string, directPhone?: string | null): string | null {
+  if (directPhone) return directPhone;
+  if (typeof window === 'undefined' || !memberId) return null;
+  try {
+    const stored = JSON.parse(localStorage.getItem('tripmate_member_phones') || '{}');
+    return stored[memberId] || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Build direct WhatsApp chat link for a specific phone number or general share
  */
 export function formatWhatsAppUrl(phone?: string | null, message?: string): string {

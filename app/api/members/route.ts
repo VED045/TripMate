@@ -49,19 +49,32 @@ export async function POST(req: NextRequest) {
     const supabase = createServiceClient();
     const assignedColor = color || MEMBER_COLORS[Math.floor(Math.random() * MEMBER_COLORS.length)];
 
-    const { data, error } = await supabase
+    const insertData: Record<string, unknown> = {
+      trip_id,
+      name: name.trim(),
+      upi_id: upi_id?.trim() || null,
+      color: assignedColor,
+      is_admin: Boolean(is_admin),
+      is_active: true,
+    };
+    if (phone?.trim()) insertData.phone = phone.trim();
+
+    let { data, error } = await supabase
       .from('members')
-      .insert({
-        trip_id,
-        name: name.trim(),
-        upi_id: upi_id?.trim() || null,
-        phone: phone?.trim() || null,
-        color: assignedColor,
-        is_admin: Boolean(is_admin),
-        is_active: true,
-      })
+      .insert(insertData)
       .select()
       .single();
+
+    if (error && (error.code === 'PGRST204' || error.message?.includes('phone'))) {
+      delete insertData.phone;
+      const retry = await supabase
+        .from('members')
+        .insert(insertData)
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) throw error;
 
@@ -104,12 +117,24 @@ export async function PATCH(req: NextRequest) {
     if (is_active !== undefined) updateData.is_active = is_active;
     updateData.updated_at = new Date().toISOString();
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('members')
       .update(updateData)
       .eq('id', id)
       .select()
       .single();
+
+    if (error && (error.code === 'PGRST204' || error.message?.includes('phone'))) {
+      delete updateData.phone;
+      const retry = await supabase
+        .from('members')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) throw error;
     return NextResponse.json(data);
