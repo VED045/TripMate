@@ -11,7 +11,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import type { Member, ItemFormRow } from '@/types';
-import { formatRupees } from '@/lib/currency';
+import { formatCurrency } from '@/lib/currency';
 import { Avatar } from '@/components/ui/Avatar';
 import { cn } from '@/lib/utils';
 
@@ -27,12 +27,13 @@ interface ItemRowProps {
   item: ItemFormRow;
   members: Member[];
   participantIds: string[];
+  currency?: string;
   onChange: (updated: ItemFormRow) => void;
   onRemove: () => void;
   index: number;
 }
 
-function ItemRow({ item, members, participantIds, onChange, onRemove, index }: ItemRowProps) {
+function ItemRow({ item, members, participantIds, currency = 'INR', onChange, onRemove, index }: ItemRowProps) {
   const [expanded, setExpanded] = useState(true);
 
   const participants = members.filter(m => participantIds.includes(m.id));
@@ -160,11 +161,11 @@ function ItemRow({ item, members, participantIds, onChange, onRemove, index }: I
       {/* Total line */}
       <div className="flex items-center justify-between px-1">
         <span className="text-[10px] text-[var(--text-muted)]">
-          {item.quantity}× ₹{item.unitPriceRupees.toFixed(2)}
-          {item.gstRatePercent > 0 && ` + ₹${gstAmt.toFixed(2)} GST`}
+          {item.quantity}× {formatCurrency(Math.round(item.unitPriceRupees * 100), currency)}
+          {item.gstRatePercent > 0 && ` + ${formatCurrency(Math.round(gstAmt * 100), currency)} GST`}
         </span>
         <span className="text-xs font-bold font-outfit text-[var(--text-primary)]">
-          = ₹{(totalItem + gstAmt).toFixed(2)}
+          = {formatCurrency(Math.round((totalItem + gstAmt) * 100), currency)}
         </span>
       </div>
 
@@ -227,6 +228,7 @@ interface ItemizedSplitEditorProps {
   participantIds: string[];
   items: ItemFormRow[];
   gstType: 'exclusive' | 'inclusive';
+  currency?: string;
   onChange: (items: ItemFormRow[]) => void;
   onGstTypeChange: (type: 'exclusive' | 'inclusive') => void;
 }
@@ -240,6 +242,7 @@ export function ItemizedSplitEditor({
   participantIds,
   items,
   gstType,
+  currency = 'INR',
   onChange,
   onGstTypeChange,
 }: ItemizedSplitEditorProps) {
@@ -335,6 +338,7 @@ export function ItemizedSplitEditor({
             item={item}
             members={members}
             participantIds={participantIds}
+            currency={currency}
             onChange={updated => updateItem(i, updated)}
             onRemove={() => removeItem(i)}
             index={i}
@@ -374,6 +378,7 @@ export function ItemizedSplitEditor({
         isOpen={isAiModalOpen}
         onClose={() => setIsAiModalOpen(false)}
         members={members}
+        currency={currency}
         onApplyItems={aiItems => onChange([...items, ...aiItems])}
       />
       <BillOcrModal
@@ -388,17 +393,17 @@ export function ItemizedSplitEditor({
         <div className="inset-card p-3 space-y-1.5">
           <div className="flex justify-between text-xs text-[var(--text-secondary)]">
             <span>Subtotal ({items.length} items)</span>
-            <span className="font-mono font-semibold">₹{subtotal.toFixed(2)}</span>
+            <span className="font-mono font-semibold">{formatCurrency(Math.round(subtotal * 100), currency)}</span>
           </div>
           {totalGst > 0 && (
             <div className="flex justify-between text-xs text-[var(--text-muted)]">
               <span>GST</span>
-              <span className="font-mono">₹{totalGst.toFixed(2)}</span>
+              <span className="font-mono">{formatCurrency(Math.round(totalGst * 100), currency)}</span>
             </div>
           )}
           <div className="flex justify-between text-sm font-bold text-[var(--text-primary)] pt-1 border-t border-[var(--border)]">
             <span>Total</span>
-            <span className="font-outfit">₹{grandTotal.toFixed(2)}</span>
+            <span className="font-outfit">{formatCurrency(Math.round(grandTotal * 100), currency)}</span>
           </div>
         </div>
       )}

@@ -403,6 +403,7 @@ export default function MoneyPage() {
         members={members}
         categories={categories}
         currentMemberId={currentMember?.id}
+        currency={trip.currency}
         onSuccess={() => { fetchMoneyData(); refreshTrip(); }}
       />
       <SettleUpModal

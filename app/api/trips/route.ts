@@ -19,7 +19,7 @@ function generateColor(): string {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { trip, members } = body;
+    const { trip, members, user_id } = body;
 
     if (!trip?.name?.trim()) {
       return NextResponse.json({ error: 'Trip name required' }, { status: 400 });
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
         description: trip.description || null,
         start_date: trip.start_date || null,
         end_date: trip.end_date || null,
-        currency: 'INR',
+        currency: trip.currency || 'INR',
       })
       .select()
       .single();
@@ -56,14 +56,72 @@ export async function POST(req: NextRequest) {
         color: generateColor(),
       }));
 
+    let createdMembers: any[] = [];
     if (memberInserts.length > 0) {
-      let { error: memberError } = await supabase.from('members').insert(memberInserts);
+      let { data: mData, error: memberError } = await supabase.from('members').insert(memberInserts).select();
       if (memberError && (memberError.code === 'PGRST204' || memberError.message?.includes('phone'))) {
         const fallbackInserts = memberInserts.map(({ phone, ...rest }: { phone?: string | null; [key: string]: any }) => rest);
-        const retry = await supabase.from('members').insert(fallbackInserts);
-        memberError = retry.error;
+        const retry = await supabase.from('members').insert(fallbackInserts).select();
+        if (retry.error) throw retry.error;
+        mData = retry.data;
+      } else if (memberError) {
+        throw memberError;
       }
-      if (memberError) throw memberError;
+      createdMembers = mData || [];
+    }
+
+    // Link trip to authenticated creator if logged in
+    if (user_id && createdMembers.length > 0) {
+      const firstMember = createdMembers[0];
+
+      // 1. Update trip created_by
+      try {
+        await supabase
+          .from('trips')
+          .update({ created_by: firstMember.id })
+          .eq('id', tripData.id);
+      } catch (e) {
+        // ignore
+      }
+
+      // 2. Insert into trip_access
+      try {
+        await supabase.from('trip_access').insert({
+          trip_id: tripData.id,
+          member_id: firstMember.id,
+          user_agent: `auth:${user_id}`,
+          accessed_at: new Date().toISOString(),
+        });
+      } catch (e) {
+        console.warn('trip_access notice:', e);
+      }
+
+      // 3. Save to auth user_metadata
+      try {
+        const { data: userData } = await supabase.auth.admin.getUserById(user_id);
+        if (userData?.user) {
+          const existingClaimed = (userData.user.user_metadata?.claimed_trips || []).filter(
+            (t: any) => t.trip_id !== tripData.id
+          );
+          existingClaimed.push({
+            trip_id: tripData.id,
+            slug: tripData.slug,
+            name: tripData.name,
+            member_id: firstMember.id,
+            member_name: firstMember.name,
+            claimed_at: new Date().toISOString(),
+          });
+
+          await supabase.auth.admin.updateUserById(user_id, {
+            user_metadata: {
+              ...userData.user.user_metadata,
+              claimed_trips: existingClaimed,
+            },
+          });
+        }
+      } catch (e) {
+        console.warn('user_metadata notice:', e);
+      }
     }
 
     // Create default albums

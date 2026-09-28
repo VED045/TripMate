@@ -74,29 +74,41 @@ export function Button({
 
 // Gradient button (for primary CTAs)
 interface GradientButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  gradient?: 'indigo' | 'rose' | 'emerald' | 'cyan' | 'amber';
+  gradient?: 'primary' | 'indigo' | 'rose' | 'emerald' | 'cyan' | 'amber';
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
   fullWidth?: boolean;
 }
 
 export function GradientButton({
-  gradient = 'indigo',
+  gradient = 'primary',
   size = 'md',
   loading = false,
   fullWidth = false,
   className,
   children,
   disabled,
+  style,
   ...props
 }: GradientButtonProps) {
-  const gradients = {
+  const gradients: Record<string, string> = {
+    primary: 'from-[#2b56ff] to-[#163ecf] shadow-blue-500/30',
     indigo: 'from-indigo-500 to-purple-600 shadow-indigo-500/25',
     rose: 'from-rose-500 to-pink-600 shadow-rose-500/25',
     emerald: 'from-emerald-500 to-teal-600 shadow-emerald-500/20',
     cyan: 'from-cyan-500 to-indigo-500 shadow-cyan-500/20',
     amber: 'from-amber-500 to-orange-500 shadow-amber-500/20',
   };
+
+  const gradientStyles: Record<string, string> = {
+    primary: 'linear-gradient(135deg, #2b56ff, #163ecf)',
+    indigo: 'linear-gradient(135deg, #6366f1, #9333ea)',
+    rose: 'linear-gradient(135deg, #f43f5e, #db2777)',
+    emerald: 'linear-gradient(135deg, #10b981, #0d9488)',
+    cyan: 'linear-gradient(135deg, #06b6d4, #4f46e5)',
+    amber: 'linear-gradient(135deg, #f59e0b, #ea580c)',
+  };
+
   const sizes = {
     sm: 'h-8 px-3 text-xs rounded-xl gap-1.5',
     md: 'h-10 px-5 text-sm rounded-xl gap-2',
@@ -106,15 +118,20 @@ export function GradientButton({
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center font-bold text-white shadow-lg',
-        'bg-gradient-to-r hover:opacity-90 active:scale-[0.98] transition-all duration-150',
+        'inline-flex items-center justify-center font-bold text-white shadow-lg cursor-pointer',
+        'hover:opacity-95 active:scale-[0.98] transition-all duration-150',
         'disabled:opacity-50 disabled:cursor-not-allowed',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50',
-        gradients[gradient],
+        gradients[gradient] || gradients.primary,
         sizes[size],
         fullWidth && 'w-full',
         className
       )}
+      style={{
+        background: gradientStyles[gradient] || gradientStyles.primary,
+        color: '#ffffff',
+        ...style,
+      }}
       disabled={disabled || loading}
       {...props}
     >

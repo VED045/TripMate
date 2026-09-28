@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   WalletCards,
@@ -15,10 +15,13 @@ import {
   Compass,
   ChevronLeft,
   ChevronRight,
+  LogOut,
+  LayoutGrid,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useActiveTrip } from '@/components/shared/ActiveTripContext';
 import { Avatar } from '@/components/ui/Avatar';
+import { useAuth } from '@/lib/auth/AuthContext';
 
 interface SidebarProps {
   slug: string;
@@ -26,8 +29,15 @@ interface SidebarProps {
 
 export function Sidebar({ slug }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { trip, currentMember } = useActiveTrip();
+  const { user, signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.replace('/');
+  };
 
   const base = `/trip/${slug}`;
 
@@ -137,7 +147,50 @@ export function Sidebar({ slug }: SidebarProps) {
         </div>
       )}
 
-      {/* Collapse toggle */}
+      {/* Auth user info or Dashboard link */}
+      <div className={cn(
+        'border-t border-[var(--border)] p-2.5 space-y-1',
+        collapsed && 'flex flex-col items-center gap-1'
+      )}>
+        {user ? (
+          <>
+            <Link
+              href="/dashboard"
+              className={cn(
+                'flex items-center gap-2 px-2.5 py-2 rounded-xl text-[var(--text-secondary)] hover:bg-[var(--surface-inset)] hover:text-[var(--accent)] transition-all',
+                collapsed && 'justify-center'
+              )}
+              title={collapsed ? 'My Trips' : undefined}
+            >
+              <LayoutGrid className="w-4 h-4 flex-shrink-0" />
+              {!collapsed && <span className="text-xs font-semibold">My Trips</span>}
+            </Link>
+            <button
+              onClick={handleSignOut}
+              className={cn(
+                'flex items-center gap-2 px-2.5 py-2 rounded-xl text-[var(--text-muted)] hover:bg-rose-500/10 hover:text-rose-600 transition-all w-full',
+                collapsed && 'justify-center'
+              )}
+              title={collapsed ? 'Sign Out' : undefined}
+            >
+              <LogOut className="w-4 h-4 flex-shrink-0" />
+              {!collapsed && <span className="text-xs font-semibold">Sign Out</span>}
+            </button>
+          </>
+        ) : (
+          <Link
+            href="/login"
+            className={cn(
+              'flex items-center gap-2 px-2.5 py-2 rounded-xl text-[var(--text-muted)] hover:bg-[var(--surface-inset)] hover:text-[var(--accent)] transition-all',
+              collapsed && 'justify-center'
+            )}
+            title={collapsed ? 'Sign In' : undefined}
+          >
+            <LogOut className="w-4 h-4 flex-shrink-0 rotate-180" />
+            {!collapsed && <span className="text-xs font-semibold">Sign In</span>}
+          </Link>
+        )}
+      </div>
       <button
         onClick={() => setCollapsed(c => !c)}
         className={cn(

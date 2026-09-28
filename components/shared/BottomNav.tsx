@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   WalletCards,
@@ -14,8 +14,13 @@ import {
   BarChart3,
   Settings,
   X,
+  LogOut,
+  User,
+  Compass,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth/AuthContext';
+import { toast } from 'sonner';
 
 interface BottomNavProps {
   slug: string;
@@ -23,6 +28,8 @@ interface BottomNavProps {
 
 export function BottomNav({ slug }: BottomNavProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, signOut } = useAuth();
   const [showMore, setShowMore] = useState(false);
 
   const base = `/trip/${slug}`;
@@ -119,6 +126,53 @@ export function BottomNav({ slug }: BottomNavProps) {
                   </Link>
                 );
               })}
+            </div>
+
+            {/* Auth / Account Bar */}
+            <div className="p-2 border-t border-[var(--border)] bg-[var(--surface-inset)]">
+              {user ? (
+                <div className="flex items-center justify-between gap-2 px-2 py-1">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] uppercase font-bold text-[var(--text-muted)] font-mono">Signed In</p>
+                    <p className="text-xs font-semibold text-[var(--text-primary)] truncate font-mono">{user.email}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <Link
+                      href="/dashboard"
+                      onClick={() => setShowMore(false)}
+                      className="px-2.5 py-1.5 rounded-xl bg-[var(--surface-raised)] border border-[var(--border)] text-xs font-bold text-[var(--accent)]"
+                    >
+                      Dashboard
+                    </Link>
+                    <button
+                      onClick={async () => {
+                        setShowMore(false);
+                        try {
+                          await signOut();
+                          toast.success('Signed out');
+                          router.push('/');
+                        } catch {
+                          toast.error('Sign out error');
+                        }
+                      }}
+                      className="px-2.5 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs font-bold text-rose-500"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between px-2 py-1">
+                  <span className="text-xs text-[var(--text-secondary)]">Not signed in</span>
+                  <Link
+                    href="/login"
+                    onClick={() => setShowMore(false)}
+                    className="px-3 py-1.5 rounded-xl bg-[var(--accent)] text-white text-xs font-bold"
+                  >
+                    Sign In
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -78,16 +78,21 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error;
 
-    // Timeline event
-    await supabase.from('timeline_events').insert({
-      trip_id,
-      event_type: 'member_added',
-      title: `${name.trim()} joined the trip!`,
-      description: 'New crew member added',
-      icon: '👋',
-      member_id: data.id,
-      color: assignedColor,
-    });
+    // If user_id is provided, link member to auth user and user_trips
+    if (body.user_id && data?.id) {
+      try {
+        await supabase.from('members').update({ auth_user_id: body.user_id }).eq('id', data.id);
+        await supabase.from('user_trips').upsert({
+          user_id: body.user_id,
+          trip_id,
+          member_id: data.id,
+          role: Boolean(is_admin) ? 'owner' : 'member',
+          claimed_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,trip_id' });
+      } catch (linkErr) {
+        console.error('Failed to link member to user_trips:', linkErr);
+      }
+    }
 
     return NextResponse.json(data, { status: 201 });
   } catch (err: unknown) {

@@ -20,11 +20,14 @@ import {
   Check,
   Crown,
   CreditCard,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Globe,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { pickPhoneContacts, parseVcfContent } from '@/lib/contacts';
 import { cn } from '@/lib/utils';
+import { SUPPORTED_CURRENCIES } from '@/lib/currency';
+import { useAuth } from '@/lib/auth/AuthContext';
 
 const MEMBER_COLORS = [
   '#2b56ff', '#10b981', '#f59e0b', '#ef4444', 
@@ -39,11 +42,13 @@ export default function CreateTripPage() {
   const vcfInputRef = useRef<HTMLInputElement>(null);
   const [targetMemberIdxForVcf, setTargetMemberIdxForVcf] = useState<number | null>(null);
 
+  const { user } = useAuth();
   const [tripData, setTripData] = useState({
     name: '',
     description: '',
     start_date: '',
     end_date: '',
+    currency: 'INR',
   });
 
   const [members, setMembers] = useState([
@@ -200,7 +205,7 @@ export default function CreateTripPage() {
       const res = await fetch('/api/trips', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trip: tripData, members: validMembers }),
+        body: JSON.stringify({ trip: tripData, members: validMembers, user_id: user?.id }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to create trip');
@@ -347,6 +352,27 @@ export default function CreateTripPage() {
                       className="w-full inset-field px-3 py-2.5 text-xs font-mono font-semibold text-[var(--text-primary)]"
                     />
                   </div>
+                </div>
+
+                {/* Currency Selector */}
+                <div>
+                  <label className="text-xs font-extrabold text-[var(--text-primary)] mb-1.5 flex items-center gap-1">
+                    <Globe className="w-3.5 h-3.5 text-[var(--accent)]" /> Trip Currency
+                  </label>
+                  <select
+                    value={tripData.currency}
+                    onChange={(e) => setTripData({ ...tripData, currency: e.target.value })}
+                    className="w-full inset-field px-3 py-2.5 text-xs font-bold text-[var(--text-primary)]"
+                  >
+                    {SUPPORTED_CURRENCIES.map(c => (
+                      <option key={c.code} value={c.code}>
+                        {c.symbol} {c.name} ({c.code})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-1 font-mono">
+                    All expenses in this currency. Can be changed later in settings.
+                  </p>
                 </div>
               </div>
 

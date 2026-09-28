@@ -9,11 +9,15 @@ import {
   Layers,
   Tag,
   List,
+  Sparkles,
+  Mic,
 } from 'lucide-react';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { GradientButton } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { ItemizedSplitEditor } from '@/components/money/ItemizedSplitEditor';
+import { NLExpenseInput } from '@/components/money/NLExpenseInput';
+import { getCurrencySymbol, formatCurrency } from '@/lib/currency';
 import type { Member, Category, ItemFormRow } from '@/types';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -38,6 +42,7 @@ interface ExpenseFormModalProps {
   members: Member[];
   categories?: Category[];
   currentMemberId?: string;
+  currency?: string;
   onSuccess: () => void;
 }
 
@@ -48,9 +53,12 @@ export function ExpenseFormModal({
   members,
   categories,
   currentMemberId,
+  currency = 'INR',
   onSuccess,
 }: ExpenseFormModalProps) {
   const activeCategories = categories ?? [];
+  const symbol = getCurrencySymbol(currency);
+  const [showNLInput, setShowNLInput] = useState(false);
 
   // Form state
   const [title, setTitle] = useState('');
@@ -234,7 +242,8 @@ export function ExpenseFormModal({
   };
 
   return (
-    <BottomSheet
+    <>
+      <BottomSheet
       isOpen={isOpen}
       onClose={onClose}
       title="Add Expense"
@@ -242,21 +251,40 @@ export function ExpenseFormModal({
       maxHeight="95dvh"
     >
       <form onSubmit={handleSubmit} className="p-5 space-y-4 pb-8">
+        {/* AI Quick Voice / Smart Fill Bar */}
+        <div className="flex items-center justify-between p-3 rounded-2xl bg-[var(--accent-subtle)] border border-[var(--border)]">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-[var(--accent)]" />
+            <span className="text-xs font-bold text-[var(--text-primary)] font-outfit">AI Quick Voice / Text Fill</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowNLInput(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white shadow transition-all active:scale-95"
+            style={{ background: 'linear-gradient(135deg, #2b56ff, #163ecf)' }}
+          >
+            <Mic className="w-3.5 h-3.5" />
+            <span>Smart Input</span>
+          </button>
+        </div>
+
         {/* Amount — only shown for non-itemized */}
         {splitType !== 'itemized' ? (
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] block mb-1.5">
-              Amount (₹ INR)
+            <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] block mb-1.5 font-mono">
+              Amount ({currency})
             </label>
             <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-2xl font-black text-[var(--accent)] pointer-events-none">₹</span>
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-2xl font-black text-[var(--accent)] pointer-events-none">
+                {symbol}
+              </span>
               <input
                 type="number"
                 step="0.01"
                 placeholder="0.00"
                 value={amountRupees}
                 onChange={e => setAmountRupees(e.target.value)}
-                className="w-full inset-field pl-10 pr-4 py-3 text-2xl font-extrabold font-outfit"
+                className="w-full inset-field pl-11 pr-4 py-3 text-2xl font-extrabold font-outfit"
                 required
                 autoFocus
               />
@@ -266,7 +294,7 @@ export function ExpenseFormModal({
           <div className="inset-card p-3 flex items-center justify-between">
             <span className="text-xs text-[var(--text-muted)]">Total (from items)</span>
             <span className="text-xl font-extrabold font-outfit text-[var(--text-primary)]">
-              ₹{itemizedTotal.toFixed(2)}
+              {formatCurrency(Math.round(itemizedTotal * 100), currency)}
             </span>
           </div>
         )}
@@ -443,6 +471,7 @@ export function ExpenseFormModal({
             participantIds={selectedMembers}
             items={items}
             gstType={gstType}
+            currency={currency}
             onChange={setItems}
             onGstTypeChange={setGstType}
           />
@@ -489,5 +518,33 @@ export function ExpenseFormModal({
         </GradientButton>
       </form>
     </BottomSheet>
+
+    {showNLInput && (
+      <NLExpenseInput
+        members={members}
+        currency={currency}
+        onParsed={(result) => {
+          if (result.description) setTitle(result.description);
+          if (result.amountPaise > 0) setAmountRupees((result.amountPaise / 100).toFixed(2));
+          if (result.paidByMemberId) setPaidBy(result.paidByMemberId);
+          if (result.participantIds && result.participantIds.length > 0) {
+            setSelectedMembers(result.participantIds);
+          }
+          if (result.splitType === 'equal' || result.splitType === 'exact') {
+            setSplitType(result.splitType);
+          }
+          if (result.categoryHint && activeCategories.length > 0) {
+            const match = activeCategories.find(c =>
+              c.name.toLowerCase().includes(result.categoryHint!.toLowerCase())
+            );
+            if (match) setCategoryId(match.id);
+          }
+          setShowNLInput(false);
+          toast.success('Applied AI details to expense!');
+        }}
+        onClose={() => setShowNLInput(false)}
+      />
+    )}
+  </>
   );
 }

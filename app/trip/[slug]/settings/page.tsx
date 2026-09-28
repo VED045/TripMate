@@ -17,6 +17,9 @@ import {
   Trash2,
   Edit3,
   ShieldAlert,
+  Globe,
+  AlertTriangle,
+  UserCheck,
 } from 'lucide-react';
 import { useActiveTrip } from '@/components/shared/ActiveTripContext';
 import { TripHeader } from '@/components/shared/TripHeader';
@@ -25,6 +28,8 @@ import { Badge } from '@/components/ui/Badge';
 import { GradientButton } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { SUPPORTED_CURRENCIES, CURRENCY_CONFIG, getCurrencySymbol } from '@/lib/currency';
+import { useAuth } from '@/lib/auth/AuthContext';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -36,10 +41,15 @@ const THEME_OPTIONS: { value: Theme; label: string; icon: React.ElementType; des
 
 export default function SettingsPage() {
   const { trip, members, currentMember, refreshTrip } = useActiveTrip();
+  const { user } = useAuth();
   const [theme, setTheme] = useState<Theme>('system');
   const [tripName, setTripName] = useState(trip?.name || '');
   const [isEditingName, setIsEditingName] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState(trip?.currency || 'INR');
+  const [showCurrencyConfirm, setShowCurrencyConfirm] = useState(false);
+  const [pendingCurrency, setPendingCurrency] = useState('');
+  const [isClaiming, setIsClaiming] = useState(false);
 
   // Read saved theme
   useEffect(() => {
@@ -112,6 +122,55 @@ export default function SettingsPage() {
       toast.error('Failed to update WhatsApp link');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleCurrencyChange = (newCurrency: string) => {
+    if (newCurrency === trip?.currency) return;
+    setPendingCurrency(newCurrency);
+    setShowCurrencyConfirm(true);
+  };
+
+  const confirmCurrencyChange = async () => {
+    if (!trip || !pendingCurrency) return;
+    try {
+      setIsSaving(true);
+      const res = await fetch(`/api/trips/${trip.slug}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currency: pendingCurrency }),
+      });
+      if (!res.ok) throw new Error('Failed to update currency');
+      setSelectedCurrency(pendingCurrency);
+      toast.success(`Currency changed to ${pendingCurrency}!`);
+      setShowCurrencyConfirm(false);
+      refreshTrip();
+    } catch {
+      toast.error('Failed to update currency');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleClaimTrip = async () => {
+    if (!trip || !user || !currentMember) return;
+    try {
+      setIsClaiming(true);
+      // Link current member to auth user + create user_trips entry
+      const res = await fetch(`/api/trips/${trip.slug}/claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id, member_id: currentMember.id }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to claim trip');
+      }
+      toast.success('Trip claimed! It will now appear in your dashboard.');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to claim trip');
+    } finally {
+      setIsClaiming(false);
     }
   };
 
@@ -263,9 +322,51 @@ export default function SettingsPage() {
 
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] block mb-1.5">
-              Currency
+              Trip Currency
             </label>
-            <p className="text-sm text-[var(--text-primary)]">{trip.currency || 'INR'} — Indian Rupees (₹)</p>
+            {showCurrencyConfirm ? (
+              <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 space-y-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+                  <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
+                    Change currency from {getCurrencySymbol(trip.currency)} {trip.currency} to {getCurrencySymbol(pendingCurrency)} {pendingCurrency}?
+                  </p>
+                </div>
+                <p className="text-[10px] text-[var(--text-muted)] leading-relaxed">
+                  Existing expense <strong>values will NOT be converted</strong>. They will simply be displayed in the new currency symbol. Only change this if all expenses are in the new currency.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={confirmCurrencyChange}
+                    disabled={isSaving}
+                    className="flex-1 py-2 rounded-xl text-xs font-bold text-white transition-all"
+                    style={{ background: 'var(--warning)' }}
+                  >
+                    {isSaving ? 'Saving...' : `Yes, change to ${pendingCurrency}`}
+                  </button>
+                  <button
+                    onClick={() => setShowCurrencyConfirm(false)}
+                    className="px-3 py-2 rounded-xl text-xs font-semibold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--surface-inset)] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <select
+                  value={selectedCurrency}
+                  onChange={e => handleCurrencyChange(e.target.value)}
+                  className="flex-1 inset-field px-3 py-2 text-sm font-bold text-[var(--text-primary)]"
+                >
+                  {SUPPORTED_CURRENCIES.map(c => (
+                    <option key={c.code} value={c.code}>
+                      {c.symbol} {c.name} ({c.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </section>
 

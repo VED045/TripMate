@@ -17,6 +17,10 @@ export interface Trip {
   access_code: string | null;
   whatsapp_link?: string | null;
   created_by: string | null;
+  owner_user_id?: string | null;    // Supabase auth user who owns this trip
+  status?: 'planning' | 'active' | 'completed' | 'archived';
+  invite_code?: string | null;
+  total_budget_paise?: number | null;
   created_at: string;
   updated_at: string;
 }

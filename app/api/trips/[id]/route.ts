@@ -70,6 +70,9 @@ export async function PATCH(
     if (body.cover_image_url !== undefined) updateData.cover_image_url = body.cover_image_url;
     if (body.access_code !== undefined) updateData.access_code = body.access_code;
     if (body.whatsapp_link !== undefined) updateData.whatsapp_link = body.whatsapp_link;
+    if (body.currency !== undefined) updateData.currency = body.currency;
+    if (body.status !== undefined) updateData.status = body.status;
+    if (body.owner_user_id !== undefined) updateData.owner_user_id = body.owner_user_id;
     updateData.updated_at = new Date().toISOString();
 
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);

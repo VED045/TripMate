@@ -14,8 +14,13 @@ import {
   ArrowDownRight,
   Minus,
   BarChart3,
+  Sparkles,
+  CheckCircle2,
+  ArrowRight,
 } from 'lucide-react';
 import { useActiveTrip } from '@/components/shared/ActiveTripContext';
+import { useAuth } from '@/lib/auth/AuthContext';
+import { createClient } from '@/lib/supabase/client';
 import { TripHeader } from '@/components/shared/TripHeader';
 import { ExpenseCard } from '@/components/money/ExpenseCard';
 import { FeaturedMemoriesCarousel } from '@/components/memories/FeaturedMemoriesCarousel';
@@ -28,8 +33,11 @@ import { TripPulseWidget } from '@/components/analytics/TripPulseWidget';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { CardSkeleton } from '@/components/shared/SkeletonLoader';
 import { Avatar } from '@/components/ui/Avatar';
-import { formatRupees, formatCurrencyCompact } from '@/lib/currency';
+import { BottomSheet } from '@/components/ui/BottomSheet';
+import { GradientButton } from '@/components/ui/Button';
+import { formatRupees, formatCurrencyCompact, formatCurrency } from '@/lib/currency';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import type {
   ExpenseWithDetails,
   MediaWithDetails,
@@ -39,7 +47,7 @@ import type {
 } from '@/types';
 
 export default function TripDashboardPage() {
-  const { trip, members, currentMember, refreshTrip } = useActiveTrip();
+  const { trip, members, currentMember, setCurrentMemberId, refreshTrip } = useActiveTrip();
 
   const [expenses, setExpenses] = useState<ExpenseWithDetails[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -49,10 +57,79 @@ export default function TripDashboardPage() {
   const [totalSpentPaise, setTotalSpentPaise] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
+  const { user } = useAuth();
+  const [isClaimed, setIsClaimed] = useState<boolean | null>(null);
+  const [showClaimModal, setShowClaimModal] = useState(false);
+  const [claimMemberId, setClaimMemberId] = useState('');
+  const [isClaiming, setIsClaiming] = useState(false);
+
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [isSettleModalOpen, setIsSettleModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!user || !trip) return;
+
+    // 1. Check user_metadata
+    const claimedInMeta = (user.user_metadata?.claimed_trips || []).some(
+      (t: any) => t.trip_id === trip.id || t.slug === trip.slug
+    );
+    if (claimedInMeta) {
+      setIsClaimed(true);
+      return;
+    }
+
+    // 2. Check trip_access table
+    const supabase = createClient();
+    supabase
+      .from('trip_access')
+      .select('id, member_id')
+      .eq('trip_id', trip.id)
+      .eq('user_agent', `auth:${user.id}`)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setIsClaimed(true);
+          if (data.member_id && (!currentMember || currentMember.id !== data.member_id)) {
+            setCurrentMemberId(data.member_id);
+          }
+        } else {
+          setIsClaimed(false);
+        }
+      });
+  }, [user, trip]);
+
+  const handleClaimTrip = async () => {
+    if (!user || !trip || !claimMemberId) {
+      toast.error('Please select which member you are');
+      return;
+    }
+    try {
+      setIsClaiming(true);
+      const res = await fetch(`/api/trips/${trip.slug}/claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id, member_id: claimMemberId }),
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Failed to claim trip');
+      }
+
+      setIsClaimed(true);
+      setShowClaimModal(false);
+      localStorage.setItem('tripmate_last_trip', trip.slug);
+      localStorage.setItem(`tripmate_active_member_${trip.slug}`, claimMemberId);
+      localStorage.setItem('tripmate_active_member', claimMemberId);
+      setCurrentMemberId(claimMemberId);
+      toast.success('Trip linked to your account! Available on your Dashboard.');
+    } catch (err: any) {
+      toast.error(err.message || 'Error claiming trip');
+    } finally {
+      setIsClaiming(false);
+    }
+  };
 
   const fetchDashboardData = async () => {
     if (!trip) return;
@@ -137,6 +214,41 @@ export default function TripDashboardPage() {
 
       <div className="max-w-4xl mx-auto w-full px-4 md:px-6 py-5 space-y-5 pb-nav">
 
+        {/* Claim Trip to Account Banner */}
+        {user && isClaimed === false && (
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-500/8 to-transparent border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-in fade-in duration-200 shadow-sm">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/20 flex items-center justify-center flex-shrink-0 text-amber-500">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-extrabold text-sm text-[var(--text-primary)] font-outfit truncate">
+                  Save {trip.name} to your trips
+                </p>
+                <p className="text-[11px] text-[var(--text-secondary)] truncate mt-0.5">
+                  Connect your account (<span className="font-mono text-[var(--accent)] font-semibold">{user.email}</span>) to track expenses &amp; settlements
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setClaimMemberId(currentMember?.id || members[0]?.id || '');
+                setShowClaimModal(true);
+              }}
+              className="px-4 py-2.5 rounded-xl font-bold text-xs text-white shadow-md flex-shrink-0 active:scale-95 transition-all flex items-center justify-center gap-1.5 self-stretch sm:self-auto cursor-pointer"
+              style={{
+                background: 'linear-gradient(135deg, #2b56ff, #163ecf)',
+                boxShadow: '0 4px 14px rgba(43, 86, 255, 0.35)',
+                color: '#ffffff',
+              }}
+            >
+              <span>Add to My Account</span>
+              <ArrowRight className="w-3.5 h-3.5 text-white" />
+            </button>
+          </div>
+        )}
+
         {/* Hero Balance Card */}
         <div className="raised-card p-5 space-y-4">
           {/* Trip name + greeting */}
@@ -151,7 +263,7 @@ export default function TripDashboardPage() {
                   netBalancePaise < 0 ? 'text-[var(--danger)]' :
                     'text-[var(--text-primary)]'
               )}>
-                {netBalancePaise >= 0 ? '' : '-'}{formatRupees(Math.abs(netBalancePaise))}
+                {netBalancePaise >= 0 ? '' : '-'}{formatRupees(Math.abs(netBalancePaise), trip.currency)}
               </div>
               <p className="text-xs text-[var(--text-muted)] mt-1">
                 {netBalancePaise > 0 ? '🟢 You are owed money' :
@@ -174,9 +286,9 @@ export default function TripDashboardPage() {
           {/* Mini stats row */}
           <div className="grid grid-cols-3 gap-3">
             {[
-              { label: 'Paid', value: formatCurrencyCompact(currentPaidPaise), color: 'var(--success)' },
-              { label: 'Share', value: formatCurrencyCompact(currentOwedPaise), color: 'var(--text-secondary)' },
-              { label: 'Trip Total', value: formatCurrencyCompact(totalSpentPaise), color: 'var(--accent)' },
+              { label: 'Paid', value: formatCurrencyCompact(currentPaidPaise, trip.currency), color: 'var(--success)' },
+              { label: 'Share', value: formatCurrencyCompact(currentOwedPaise, trip.currency), color: 'var(--text-secondary)' },
+              { label: 'Trip Total', value: formatCurrencyCompact(totalSpentPaise, trip.currency), color: 'var(--accent)' },
             ].map(stat => (
               <div key={stat.label} className="inset-card p-3 text-center">
                 <div className="text-sm font-bold font-outfit" style={{ color: stat.color }}>{stat.value}</div>
@@ -375,6 +487,7 @@ export default function TripDashboardPage() {
         members={members}
         categories={categories}
         currentMemberId={currentMember?.id}
+        currency={trip.currency}
         onSuccess={() => { fetchDashboardData(); refreshTrip(); }}
       />
 
@@ -406,6 +519,74 @@ export default function TripDashboardPage() {
           mediaList={mediaList}
           initialIndex={viewerIndex}
         />
+      )}
+
+      {/* Claim Trip Modal */}
+      {showClaimModal && (
+        <BottomSheet
+          isOpen={showClaimModal}
+          onClose={() => setShowClaimModal(false)}
+          title="Add Trip to Your Account"
+          subtitle={`Link "${trip.name}" to ${user?.email}`}
+        >
+          <div className="p-5 space-y-4">
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+              Select which person you are in this trip. This will link your account to your profile, expenses, and balances.
+            </p>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] font-mono block">
+                Select Your Member Profile
+              </label>
+              <div className="space-y-1.5 max-h-56 overflow-y-auto">
+                {members.map(m => (
+                  <div
+                    key={m.id}
+                    onClick={() => setClaimMemberId(m.id)}
+                    className={cn(
+                      'p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between',
+                      claimMemberId === m.id
+                        ? 'bg-[var(--accent-subtle)] border-[var(--accent)] shadow-sm'
+                        : 'bg-[var(--surface-inset)] border-[var(--border)] hover:bg-[var(--surface-raised)]'
+                    )}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Avatar name={m.name} color={m.color} size="sm" />
+                      <div>
+                        <span className="text-xs font-bold text-[var(--text-primary)] block">{m.name}</span>
+                        {m.upi_id && <span className="text-[10px] text-[var(--text-muted)] font-mono">{m.upi_id}</span>}
+                      </div>
+                    </div>
+                    {claimMemberId === m.id && (
+                      <CheckCircle2 className="w-4 h-4 text-[var(--accent)]" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              disabled={!claimMemberId || isClaiming}
+              onClick={handleClaimTrip}
+              className="w-full py-3.5 px-5 rounded-2xl font-bold text-sm text-white shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              style={{
+                background: 'linear-gradient(135deg, #2b56ff, #163ecf)',
+                boxShadow: '0 6px 20px rgba(43, 86, 255, 0.35)',
+                color: '#ffffff',
+              }}
+            >
+              {isClaiming ? (
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4 text-white" />
+                  <span>Confirm &amp; Add to My Account</span>
+                </>
+              )}
+            </button>
+          </div>
+        </BottomSheet>
       )}
     </div>
   );
