@@ -187,6 +187,44 @@ body {
   transition: background-color 0.3s ease, color 0.2s ease;
 }
 
+/* Travel motion language — composited transforms only, so navigation stays smooth. */
+.tripmate-landing::before, .tripmate-landing::after { content: ''; position: absolute; width: min(70vw, 760px); aspect-ratio: 1; border-radius: 999px; filter: blur(6px); pointer-events: none; opacity: .48; }
+.tripmate-landing::before { top: 7rem; right: -26rem; background: radial-gradient(circle, color-mix(in srgb, var(--accent) 24%, transparent), transparent 66%); }
+.tripmate-landing::after { bottom: 3rem; left: -30rem; background: radial-gradient(circle, rgba(16, 185, 129, .15), transparent 66%); }
+.tripmate-flight-map { position: relative; width: min(86vw, 470px); height: 64px; border-radius: 999px; background: color-mix(in srgb, var(--surface-raised) 80%, transparent); border: 1px solid var(--border); box-shadow: var(--shadow-card); overflow: hidden; }
+.tripmate-map-route { position: absolute; left: 16%; right: 16%; top: 31px; height: 2px; background: repeating-linear-gradient(90deg, var(--accent) 0 8px, transparent 8px 15px); opacity: .7; }
+.tripmate-map-pin, .tripmate-map-plane { position: absolute; z-index: 2; display: grid; place-items: center; }
+.tripmate-map-pin { top: 20px; width: 25px; height: 25px; color: var(--accent); }
+.tripmate-map-pin svg { width: 20px; height: 20px; fill: color-mix(in srgb, var(--accent) 18%, transparent); }
+.tripmate-map-pin-start { left: 10%; }.tripmate-map-pin-end { right: 10%; color: var(--success); }.tripmate-map-pin-end svg { fill: color-mix(in srgb, var(--success) 18%, transparent); }
+.tripmate-map-plane { top: 17px; left: 20%; color: var(--accent); animation: tripmate-flight 5.6s cubic-bezier(.55, 0, .3, 1) infinite; }
+.tripmate-map-plane svg { width: 29px; height: 29px; transform: rotate(12deg); filter: drop-shadow(0 5px 5px color-mix(in srgb, var(--accent) 30%, transparent)); }
+.tripmate-map-label { position: absolute; bottom: 6px; font: 700 9px/1 var(--font-mono); color: var(--text-muted); letter-spacing: .08em; text-transform: uppercase; }.tripmate-map-label-start { left: 9%; }.tripmate-map-label-end { right: 8%; }
+@keyframes tripmate-flight { 0%, 8% { transform: translateX(0) translateY(2px) rotate(-4deg); opacity: 0; } 15% { opacity: 1; } 55% { transform: translateX(175px) translateY(-7px) rotate(3deg); } 88% { transform: translateX(280px) translateY(2px) rotate(-2deg); opacity: 1; } 100% { transform: translateX(300px) translateY(3px); opacity: 0; } }
+.tripmate-hero-console { width: min(86vw, 470px); border: 1px solid var(--border); border-radius: 20px; padding: 6px; background: color-mix(in srgb, var(--surface-raised) 85%, transparent); box-shadow: var(--shadow-card); text-align: left; }
+.tripmate-hero-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 3px; border-radius: 14px; background: var(--surface-inset); }
+.tripmate-hero-tabs button { min-height: 31px; border-radius: 10px; color: var(--text-muted); font: 800 10px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; transition: background-color .2s ease, color .2s ease, transform .2s ease; }
+.tripmate-hero-tabs button:hover { color: var(--text-primary); }.tripmate-hero-tabs button.is-active { color: var(--accent); background: var(--surface-raised); box-shadow: var(--shadow-card); transform: translateY(-1px); }
+.tripmate-hero-mode { min-height: 64px; display: flex; align-items: center; gap: 11px; padding: 12px 10px 7px; }
+.tripmate-hero-mode-icon { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; flex: 0 0 auto; }.tripmate-hero-mode-icon svg { width: 18px; height: 18px; }
+.tripmate-hero-mode p { margin: 0; color: var(--text-primary); font: 800 13px/1.2 var(--font-display); }.tripmate-hero-mode span { display: block; margin-top: 3px; color: var(--text-secondary); font-size: 10px; line-height: 1.35; }
+.tripmate-feature-card { position: relative; overflow: hidden; min-height: 205px; border-color: var(--border); transition: border-color .25s ease, box-shadow .25s ease !important; }
+.tripmate-feature-card::after { content: ''; position: absolute; width: 110px; height: 110px; right: -42px; top: -42px; border-radius: 99px; background: var(--feature-tint); opacity: .08; transition: transform .35s ease, opacity .35s ease; }
+.tripmate-feature-card:hover::after, .tripmate-feature-card.is-active::after { transform: scale(1.35); opacity: .16; }
+.tripmate-feature-card.is-active { border-color: var(--feature-tint); box-shadow: 0 14px 30px color-mix(in srgb, var(--feature-tint) 18%, transparent), var(--shadow-card); }
+.tripmate-feature-icon { position: relative; z-index: 1; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 13px; background: color-mix(in srgb, var(--feature-tint) 13%, var(--surface-raised)); color: var(--feature-tint); border: 1px solid color-mix(in srgb, var(--feature-tint) 28%, var(--border)); }
+.tripmate-route-transition { position: fixed; inset: 0; z-index: 9999; pointer-events: none; overflow: hidden; opacity: 0; animation: tripmate-route-layer 920ms cubic-bezier(.2,.8,.2,1) both; }
+.tripmate-route-glow { position: absolute; width: 42vw; height: 42vw; min-width: 280px; min-height: 280px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--accent) 28%, transparent), transparent 68%); filter: blur(12px); animation: tripmate-route-glow 920ms ease-out both; }
+.tripmate-route-plane { position: absolute; display: grid; place-items: center; width: 68px; height: 68px; border-radius: 999px; color: white; background: linear-gradient(135deg, var(--accent-light), var(--accent-dark)); box-shadow: 0 14px 45px color-mix(in srgb, var(--accent) 45%, transparent); animation: tripmate-route-plane 920ms cubic-bezier(.16,1,.3,1) both; }
+.tripmate-route-plane svg { width: 31px; height: 31px; transform: rotate(24deg); }
+.tripmate-route-trail { position: absolute; height: 2px; border-radius: 99px; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 65%, transparent), transparent); transform-origin: left; animation: tripmate-route-trail 780ms ease-out both; }
+.tripmate-route-trail-one { width: 42vw; }.tripmate-route-trail-two { width: 26vw; animation-delay: 65ms; opacity: .6; }
+@keyframes tripmate-route-layer { 0% { opacity: 0; } 8%, 74% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes tripmate-route-plane { 0% { transform: translate(-100px, 92vh) rotate(-16deg) scale(.65); } 50% { transform: translate(47vw, 44vh) rotate(-8deg) scale(1); } 100% { transform: translate(110vw, -12vh) rotate(-16deg) scale(.74); } }
+@keyframes tripmate-route-trail { 0% { left: -30vw; top: 92vh; transform: rotate(-33deg) scaleX(.2); opacity: 0; } 24% { opacity: 1; } 100% { left: 45vw; top: 43vh; transform: rotate(-33deg) scaleX(1); opacity: 0; } }
+@keyframes tripmate-route-glow { 0% { transform: translate(-20vw, 70vh) scale(.35); opacity: 0; } 52% { opacity: 1; } 100% { transform: translate(83vw, -15vh) scale(1.4); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .tripmate-map-plane, .tripmate-route-transition, .tripmate-route-glow, .tripmate-route-plane, .tripmate-route-trail { animation: none !important; } .tripmate-route-transition { display: none; } }
+
 /* ==========================================================================
    COMPONENT UTILITY CLASSES
    ========================================================================== */

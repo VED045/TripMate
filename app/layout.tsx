@@ -3,6 +3,7 @@ import './globals.css';
 import { Toaster } from 'sonner';
 import { AuthProvider } from '@/lib/auth/AuthContext';
 import { ThemeProvider } from '@/components/shared/ThemeContext';
+import { PageWaveTransition } from '@/components/shared/PageWaveTransition';
 
 export const metadata: Metadata = {
   title: 'TripMate — Group Travel & Expense OS',
@@ -59,7 +60,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <AuthProvider>
-          <ThemeProvider>{children}</ThemeProvider>
+          <ThemeProvider>
+            <PageWaveTransition />
+            {children}
+          </ThemeProvider>
         </AuthProvider>
         <Toaster
           position="top-center"

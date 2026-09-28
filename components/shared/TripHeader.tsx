@@ -4,7 +4,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  Compass,
   Settings,
   Share2,
   Calendar,
@@ -20,6 +19,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { JoinTripModal } from '@/components/trip/JoinTripModal';
+import { TripMateMark } from '@/components/shared/TripMateMark';
 
 interface TripHeaderProps {
   title?: string;
@@ -119,7 +119,7 @@ export function TripHeader({
             className="flex-shrink-0 w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-white shadow-sm transition-all active:scale-95 hover:shadow-md"
             style={{ background: 'linear-gradient(135deg, #2b56ff, #163ecf)' }}
           >
-            <Compass className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-white" />
+            <TripMateMark className="w-5 h-5 text-white" />
           </Link>
 
           {/* Trip Info Header */}

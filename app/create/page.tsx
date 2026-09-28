@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Compass, 
   MapPin, 
   Calendar, 
   Users, 
@@ -28,6 +27,7 @@ import { pickPhoneContacts, parseVcfContent } from '@/lib/contacts';
 import { cn } from '@/lib/utils';
 import { SUPPORTED_CURRENCIES } from '@/lib/currency';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { TripMateMark } from '@/components/shared/TripMateMark';
 
 const MEMBER_COLORS = [
   '#2b56ff', '#10b981', '#f59e0b', '#ef4444', 
@@ -240,7 +240,7 @@ export default function CreateTripPage() {
 
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-sm" style={{ background: 'linear-gradient(135deg, #2b56ff, #163ecf)' }}>
-            <Compass className="w-4 h-4 text-white" />
+            <TripMateMark className="w-5 h-5 text-white" />
           </div>
           <span className="font-outfit font-extrabold text-base text-[var(--text-primary)]">
             Trip<span style={{ color: 'var(--accent)' }}>Mate</span> Setup

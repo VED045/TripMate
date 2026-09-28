@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Compass,
   Plus,
   Wallet,
   Camera,
@@ -30,6 +29,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Avatar } from '@/components/ui/Avatar';
 import { JoinTripModal } from '@/components/trip/JoinTripModal';
+import { TripMateMark } from '@/components/shared/TripMateMark';
 
 interface TripSummary {
   id: string;
@@ -68,7 +68,7 @@ export default function DashboardPage() {
     try {
       setIsLoading(true);
 
-      const res = await fetch(`/api/user/trips?user_id=${user.id}`);
+      const res = await fetch('/api/user/trips');
       if (res.ok) {
         const data = await res.json();
         setTrips(data.trips || []);
@@ -114,7 +114,7 @@ export default function DashboardPage() {
         <div className="space-y-4 text-center">
           <div className="w-12 h-12 rounded-2xl mx-auto flex items-center justify-center"
             style={{ background: 'linear-gradient(135deg, #2b56ff, #163ecf)' }}>
-            <Compass className="w-6 h-6 text-white animate-pulse" />
+            <TripMateMark className="w-7 h-7 text-white animate-pulse" />
           </div>
           <p className="text-sm text-[var(--text-muted)] font-medium">Loading your trips...</p>
         </div>
@@ -131,7 +131,7 @@ export default function DashboardPage() {
           <Link href="/" className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center"
               style={{ background: 'linear-gradient(135deg, #2b56ff, #163ecf)' }}>
-              <Compass className="w-4 h-4 text-white" />
+              <TripMateMark className="w-5 h-5 text-white" />
             </div>
             <span className="font-outfit font-black text-lg tracking-tight text-[var(--text-primary)]">
               Trip<span style={{ color: 'var(--accent)' }}>Mate</span>

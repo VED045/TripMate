@@ -12,7 +12,6 @@ import {
   BookUser,
   BarChart3,
   Settings,
-  Compass,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -22,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { useActiveTrip } from '@/components/shared/ActiveTripContext';
 import { Avatar } from '@/components/ui/Avatar';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { TripMateMark } from '@/components/shared/TripMateMark';
 
 interface SidebarProps {
   slug: string;
@@ -73,7 +73,7 @@ export function Sidebar({ slug }: SidebarProps) {
       )}>
         <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
           style={{ background: 'var(--accent)' }}>
-          <Compass className="w-4 h-4 text-white" />
+          <TripMateMark className="w-5 h-5 text-white" />
         </div>
         {!collapsed && (
           <div className="min-w-0">

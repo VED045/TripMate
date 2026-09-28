@@ -5,13 +5,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
-  ArrowLeft, CheckCircle2, Compass, CreditCard, Mail, Moon,
+  ArrowLeft, CheckCircle2, CreditCard, Mail, Moon,
   Phone, Save, ShieldCheck, Sun, User,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { useTheme } from '@/components/shared/ThemeContext';
 import { LocalAiSettings } from '@/components/ai/LocalAiSettings';
 import { toast } from 'sonner';
+import { TripMateMark } from '@/components/shared/TripMateMark';
 
 type Profile = {
   display_name: string;
@@ -93,7 +94,7 @@ export default function AccountSettingsPage() {
     }
   };
 
-  if (authLoading) return <div className="min-h-screen flex items-center justify-center"><Compass className="w-5 h-5 text-[var(--accent)] animate-pulse" /></div>;
+  if (authLoading) return <div className="min-h-screen flex items-center justify-center"><TripMateMark className="w-7 h-7 text-[var(--accent)] animate-pulse" /></div>;
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--background)' }}>

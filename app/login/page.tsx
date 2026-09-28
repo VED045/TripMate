@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
-  Compass,
   Mail,
   Lock,
   Eye,
@@ -19,6 +18,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { toast } from 'sonner';
+import { TripMateMark } from '@/components/shared/TripMateMark';
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -161,7 +161,7 @@ function LoginForm() {
               className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg hover:scale-105 transition-transform"
               style={{ background: 'linear-gradient(135deg, #2b56ff, #163ecf)' }}
             >
-              <Compass className="w-6 h-6" />
+              <TripMateMark className="w-7 h-7" />
             </Link>
           </div>
           <h1 className="text-3xl font-extrabold font-outfit text-[var(--text-primary)] tracking-tight">

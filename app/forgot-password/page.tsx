@@ -3,9 +3,10 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Compass, Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import { TripMateMark } from '@/components/shared/TripMateMark';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -48,7 +49,7 @@ export default function ForgotPasswordPage() {
               className="w-12 h-12 rounded-2xl flex items-center justify-center text-white"
               style={{ background: 'linear-gradient(135deg, #2b56ff, #163ecf)' }}
             >
-              <Compass className="w-6 h-6" />
+              <TripMateMark className="w-7 h-7" />
             </div>
           </div>
           <h1 className="text-2xl font-extrabold font-outfit text-[var(--text-primary)]">

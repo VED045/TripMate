@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Compass,
   Users,
   UserCheck,
   UserPlus,
@@ -19,6 +18,7 @@ import { useAuth } from '@/lib/auth/AuthContext';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { Trip, Member } from '@/types';
+import { TripMateMark } from '@/components/shared/TripMateMark';
 
 interface JoinTripModalProps {
   isOpen: boolean;
@@ -259,7 +259,7 @@ export function JoinTripModal({
                   className="w-10 h-10 rounded-xl flex items-center justify-center text-white flex-shrink-0 shadow-sm"
                   style={{ background: 'linear-gradient(135deg, #2b56ff, #163ecf)' }}
                 >
-                  <Compass className="w-5 h-5 text-white" />
+                  <TripMateMark className="w-6 h-6 text-white" />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">

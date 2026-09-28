@@ -17,6 +17,7 @@ import {
   LogOut,
   User,
   Compass,
+  ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth/AuthContext';
@@ -62,6 +63,7 @@ export function BottomNav({ slug }: BottomNavProps) {
   ];
 
   const moreItems = [
+    { label: 'Plan', href: `${base}/plan`, icon: ClipboardList },
     { label: 'Timeline', href: `${base}/timeline`, icon: Clock },
     { label: 'Analytics', href: `${base}/analytics`, icon: BarChart3 },
     { label: 'Directory', href: `${base}/directory`, icon: BookUser },

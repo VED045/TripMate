@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Wallet,
   Receipt,
   Percent,
   Divide,
   Layers,
-  Tag,
   List,
   Sparkles,
   Mic,
@@ -56,9 +55,10 @@ export function ExpenseFormModal({
   currency = 'INR',
   onSuccess,
 }: ExpenseFormModalProps) {
-  const activeCategories = categories ?? [];
+  const activeCategories = useMemo(() => categories ?? [], [categories]);
   const symbol = getCurrencySymbol(currency);
   const [showNLInput, setShowNLInput] = useState(false);
+  const [showAdvancedSplits, setShowAdvancedSplits] = useState(false);
 
   // Form state
   const [title, setTitle] = useState('');
@@ -80,22 +80,25 @@ export function ExpenseFormModal({
   // Set default category on load
   useEffect(() => {
     if (activeCategories.length > 0 && !activeCategories.some(c => c.id === categoryId)) {
-      setCategoryId(activeCategories[0].id);
+      queueMicrotask(() => setCategoryId(activeCategories[0].id));
     }
-  }, [activeCategories]);
+  }, [activeCategories, categoryId]);
 
   // Reset form on open
   useEffect(() => {
     if (isOpen) {
-      setTitle('');
-      setAmountRupees('');
-      setSplitType('equal');
-      setSelectedMembers(members.map(m => m.id));
-      setCustomSplits({});
-      setNote('');
-      setExpenseDate(new Date().toISOString().split('T')[0]);
-      setReceiptFile(null);
-      setItems([]);
+      queueMicrotask(() => {
+        setTitle('');
+        setAmountRupees('');
+        setSplitType('equal');
+        setShowAdvancedSplits(false);
+        setSelectedMembers(members.map(m => m.id));
+        setCustomSplits({});
+        setNote('');
+        setExpenseDate(new Date().toISOString().split('T')[0]);
+        setReceiptFile(null);
+        setItems([]);
+      });
     }
   }, [isOpen, members]);
 
@@ -250,12 +253,12 @@ export function ExpenseFormModal({
       subtitle="Record costs & split automatically"
       maxHeight="95dvh"
     >
-      <form onSubmit={handleSubmit} className="p-5 space-y-4 pb-8">
+      <form onSubmit={handleSubmit} className="p-5 space-y-5 pb-8">
         {/* AI Quick Voice / Smart Fill Bar */}
-        <div className="flex items-center justify-between p-3 rounded-2xl bg-[var(--accent-subtle)] border border-[var(--border)]">
+        <div className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-[var(--accent-subtle)] border border-[var(--border)]">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-[var(--accent)]" />
-            <span className="text-xs font-bold text-[var(--text-primary)] font-outfit">AI Quick Voice / Text Fill</span>
+            <div><span className="text-xs font-bold text-[var(--text-primary)] font-outfit block">Quick add</span><span className="text-[10px] text-[var(--text-muted)]">Describe it; review before saving.</span></div>
           </div>
           <button
             type="button"
@@ -264,12 +267,13 @@ export function ExpenseFormModal({
             style={{ background: 'linear-gradient(135deg, #2b56ff, #163ecf)' }}
           >
             <Mic className="w-3.5 h-3.5" />
-            <span>Smart Input</span>
+            <span>Describe</span>
           </button>
         </div>
 
-        {/* Amount — only shown for non-itemized */}
-        {splitType !== 'itemized' ? (
+        <section className="rounded-2xl border border-[var(--border)] p-3 sm:p-4 space-y-3" style={{ background: 'var(--surface-inset)' }}>
+          {/* Amount — only shown for non-itemized */}
+          {splitType !== 'itemized' ? (
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] block mb-1.5 font-mono">
               Amount ({currency})
@@ -290,17 +294,17 @@ export function ExpenseFormModal({
               />
             </div>
           </div>
-        ) : (
+          ) : (
           <div className="inset-card p-3 flex items-center justify-between">
             <span className="text-xs text-[var(--text-muted)]">Total (from items)</span>
             <span className="text-xl font-extrabold font-outfit text-[var(--text-primary)]">
               {formatCurrency(Math.round(itemizedTotal * 100), currency)}
             </span>
           </div>
-        )}
+          )}
 
-        {/* Title */}
-        <div>
+          {/* Title */}
+          <div>
           <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] block mb-1.5">
             Title
           </label>
@@ -309,10 +313,13 @@ export function ExpenseFormModal({
             placeholder="e.g. Seafood Dinner, Petrol, Hotel Stay"
             value={title}
             onChange={e => setTitle(e.target.value)}
+            maxLength={120}
+            autoComplete="off"
             className="w-full inset-field px-3.5 py-2.5 text-sm"
             required
           />
-        </div>
+          </div>
+        </section>
 
         {/* Paid By + Date */}
         <div className="grid grid-cols-2 gap-3">
@@ -366,29 +373,27 @@ export function ExpenseFormModal({
 
         {/* Split Type */}
         <div>
-          <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] block mb-1.5">
-            Split Method
-          </label>
-          <div className="grid grid-cols-5 gap-1 p-1 rounded-2xl" style={{ background: 'var(--surface-inset)', boxShadow: 'var(--shadow-inset)' }}>
-            {SPLIT_TYPES.map(({ type, label, icon: Icon }) => (
+          <div className="flex items-center justify-between mb-1.5"><label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Split method</label><button type="button" onClick={() => setShowAdvancedSplits(value => !value)} className="text-[10px] font-bold text-[var(--accent)]">{showAdvancedSplits ? 'Hide options' : 'More options'}</button></div>
+          <div className="grid grid-cols-2 gap-2">
+            {SPLIT_TYPES.filter(option => showAdvancedSplits || option.type === 'equal' || option.type === 'itemized' || option.type === splitType).map(({ type, label, icon: Icon }) => (
               <button
                 key={type}
                 type="button"
                 onClick={() => setSplitType(type)}
                 className={cn(
-                  'flex flex-col items-center gap-1 py-2 px-1 rounded-xl text-[10px] font-semibold transition-all',
+                  'flex items-center gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-all border text-left',
                   splitType === type
-                    ? 'bg-[var(--surface-raised)] text-[var(--accent)] shadow-[var(--shadow-card)]'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                    ? 'bg-[var(--accent-subtle)] border-[var(--accent)] text-[var(--accent)]'
+                    : 'border-[var(--border)] bg-[var(--surface-inset)] text-[var(--text-secondary)] hover:border-[var(--border-strong)]'
                 )}
                 title={type}
               >
-                <Icon className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{label}</span>
+                <Icon className="w-4 h-4 shrink-0" />
+                <span>{label}</span>
               </button>
             ))}
           </div>
-          <p className="text-[10px] text-[var(--text-muted)] mt-1">
+          <p className="text-[10px] text-[var(--text-muted)] mt-2">
             {SPLIT_TYPES.find(s => s.type === splitType)?.description}
           </p>
         </div>
@@ -408,7 +413,8 @@ export function ExpenseFormModal({
                 All
               </button>
             </div>
-            <div className="space-y-1.5 max-h-44 overflow-y-auto">
+            <p className="text-[10px] text-[var(--text-muted)] -mt-1 mb-2">Tap people to include them. {splitType === 'equal' && effectiveAmount > 0 ? `Each selected person owes about ${symbol}${(effectiveAmount / selectedMembers.length).toFixed(2)}.` : ''}</p>
+            <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
               {members.map(m => {
                 const isSelected = selectedMembers.includes(m.id);
                 const shareAmt = isSelected && splitType === 'equal' && effectiveAmount > 0
