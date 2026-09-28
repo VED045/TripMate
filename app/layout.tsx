@@ -36,8 +36,9 @@ const themeScript = `
 (function() {
   try {
     var saved = localStorage.getItem('tripmate_theme');
-    var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    var theme = saved === 'light' ? 'light' : saved === 'dark' ? 'dark' : (prefersDark ? 'dark' : 'light');
+    // Light is the product default. The OS preference is deliberately ignored
+    // until a person explicitly selects Dark in TripMate settings.
+    var theme = saved === 'dark' ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', theme);
   } catch(e) {}
 })();

@@ -6,7 +6,6 @@ import {
   Settings,
   Moon,
   Sun,
-  Monitor,
   Palette,
   Bell,
   Users,
@@ -30,19 +29,20 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { SUPPORTED_CURRENCIES, CURRENCY_CONFIG, getCurrencySymbol } from '@/lib/currency';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { LocalAiSettings } from '@/components/ai/LocalAiSettings';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 
-type Theme = 'light' | 'dark' | 'system';
+type Theme = 'light' | 'dark';
 
 const THEME_OPTIONS: { value: Theme; label: string; icon: React.ElementType; desc: string }[] = [
   { value: 'light', label: 'Light', icon: Sun, desc: 'Soft neumorphic light mode' },
   { value: 'dark', label: 'Dark', icon: Moon, desc: 'Midnight dark mode' },
-  { value: 'system', label: 'System', icon: Monitor, desc: 'Follow device preference' },
 ];
 
 export default function SettingsPage() {
   const { trip, members, currentMember, refreshTrip } = useActiveTrip();
   const { user } = useAuth();
-  const [theme, setTheme] = useState<Theme>('system');
+  const [theme, setTheme] = useState<Theme>('light');
   const [tripName, setTripName] = useState(trip?.name || '');
   const [isEditingName, setIsEditingName] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -54,21 +54,17 @@ export default function SettingsPage() {
   // Read saved theme
   useEffect(() => {
     const saved = localStorage.getItem('tripmate_theme') as Theme | null;
-    if (saved) setTheme(saved);
-    if (trip?.name) setTripName(trip.name);
-  }, [trip?.name]);
+    if (saved === 'light' || saved === 'dark') queueMicrotask(() => setTheme(saved));
+    if (trip?.name) queueMicrotask(() => setTripName(trip.name));
+    if (trip?.currency) queueMicrotask(() => setSelectedCurrency(trip.currency));
+  }, [trip?.name, trip?.currency]);
 
   const applyTheme = (t: Theme) => {
     setTheme(t);
     localStorage.setItem('tripmate_theme', t);
 
     const root = document.documentElement;
-    if (t === 'system') {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      root.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
-    } else {
-      root.setAttribute('data-theme', t);
-    }
+    root.setAttribute('data-theme', t);
     toast.success(`Switched to ${t} mode`);
   };
 
@@ -160,15 +156,15 @@ export default function SettingsPage() {
       const res = await fetch(`/api/trips/${trip.slug}/claim`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user.id, member_id: currentMember.id }),
+        body: JSON.stringify({ member_id: currentMember.id }),
       });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || 'Failed to claim trip');
       }
       toast.success('Trip claimed! It will now appear in your dashboard.');
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to claim trip');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to claim trip');
     } finally {
       setIsClaiming(false);
     }
@@ -353,22 +349,29 @@ export default function SettingsPage() {
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-3">
-                <select
+              <div className="w-full">
+                <CustomSelect
                   value={selectedCurrency}
-                  onChange={e => handleCurrencyChange(e.target.value)}
-                  className="flex-1 inset-field px-3 py-2 text-sm font-bold text-[var(--text-primary)]"
-                >
-                  {SUPPORTED_CURRENCIES.map(c => (
-                    <option key={c.code} value={c.code}>
-                      {c.symbol} {c.name} ({c.code})
-                    </option>
-                  ))}
-                </select>
+                  onChange={handleCurrencyChange}
+                  options={SUPPORTED_CURRENCIES.map(c => ({
+                    value: c.code,
+                    label: `${c.name} (${c.code})`,
+                    icon: (
+                      <span className="min-w-5 h-5 px-1 rounded-md bg-black/5 dark:bg-white/10 flex items-center justify-center font-mono font-bold text-[11px] shrink-0">
+                        {c.symbol}
+                      </span>
+                    ),
+                  }))}
+                  className="w-full"
+                  buttonClassName="h-10 py-0 px-3 bg-[var(--surface-raised)] hover:bg-[var(--surface-inset)] border-[var(--border)] shadow-sm text-xs font-bold rounded-xl"
+                  menuClassName="w-full left-0 right-0"
+                />
               </div>
             )}
           </div>
         </section>
+
+        <LocalAiSettings />
 
         {/* Appearance */}
         <section className="raised-card p-5 space-y-4">
@@ -448,24 +451,34 @@ export default function SettingsPage() {
           <div className="space-y-2">
             <button
               onClick={handleExportCSV}
-              className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-[var(--border)] hover:bg-[var(--surface-inset)] transition-colors"
+              className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-[var(--border)] hover:bg-[var(--surface-inset)] transition-all cursor-pointer group text-left"
             >
-              <div>
-                <p className="text-xs font-bold text-[var(--text-primary)]">Export CSV</p>
-                <p className="text-[10px] text-[var(--text-muted)]">Spreadsheet of all expenses</p>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-base shrink-0 group-hover:scale-105 transition-transform">
+                  📊
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-[var(--text-primary)]">Export CSV</p>
+                  <p className="text-[10px] text-[var(--text-muted)]">Spreadsheet of all expenses</p>
+                </div>
               </div>
-              <ChevronRight className="w-4 h-4 text-[var(--text-muted)]" />
+              <ChevronRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--text-primary)] group-hover:translate-x-0.5 transition-all shrink-0" />
             </button>
 
             <button
               onClick={handleExportZip}
-              className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-[var(--border)] hover:bg-[var(--surface-inset)] transition-colors"
+              className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-[var(--border)] hover:bg-[var(--surface-inset)] transition-all cursor-pointer group text-left"
             >
-              <div>
-                <p className="text-xs font-bold text-[var(--text-primary)]">Export Full Archive</p>
-                <p className="text-[10px] text-[var(--text-muted)]">ZIP with photos, CSV, and report</p>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-base shrink-0 group-hover:scale-105 transition-transform">
+                  📦
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-[var(--text-primary)]">Export Full Archive</p>
+                  <p className="text-[10px] text-[var(--text-muted)]">ZIP with photos, CSV, and report</p>
+                </div>
               </div>
-              <ChevronRight className="w-4 h-4 text-[var(--text-muted)]" />
+              <ChevronRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--text-primary)] group-hover:translate-x-0.5 transition-all shrink-0" />
             </button>
           </div>
         </section>

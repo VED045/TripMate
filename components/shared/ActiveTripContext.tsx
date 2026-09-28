@@ -58,40 +58,44 @@ export function ActiveTripProvider({
 
   useEffect(() => {
     if (!initialTrip) {
-      fetchTripData();
+      queueMicrotask(() => { void fetchTripData(); });
     }
   }, [slug]);
 
   // Load saved current member from localStorage, auth claimed_trips, or fallback
   useEffect(() => {
     if (members.length > 0) {
+      let nextMemberId: string | null = null;
       // 1. Check localStorage for this trip first
       const savedId = localStorage.getItem(`tripmate_active_member_${slug}`);
       if (savedId && members.some(m => m.id === savedId)) {
-        setCurrentMemberIdState(savedId);
-        return;
+        nextMemberId = savedId;
       }
 
       // 2. Check user_metadata.claimed_trips
-      const claimed = user?.user_metadata?.claimed_trips?.find(
-        (t: any) => t.trip_id === trip?.id || t.slug === slug || t.trip_slug === slug
-      );
-      if (claimed && members.some(m => m.id === claimed.member_id)) {
-        setCurrentMemberIdState(claimed.member_id);
-        localStorage.setItem(`tripmate_active_member_${slug}`, claimed.member_id);
-        return;
+      const claimedTrips = user?.user_metadata?.claimed_trips;
+      const claimed = Array.isArray(claimedTrips) ? claimedTrips.find(
+        (entry): entry is { trip_id?: string; slug?: string; trip_slug?: string; member_id?: string } =>
+          Boolean(entry) && typeof entry === 'object' &&
+          ((entry as { trip_id?: string }).trip_id === trip?.id || (entry as { slug?: string }).slug === slug || (entry as { trip_slug?: string }).trip_slug === slug)
+      ) : undefined;
+      if (!nextMemberId && claimed?.member_id && members.some(m => m.id === claimed.member_id)) {
+        nextMemberId = claimed.member_id;
       }
 
       // 3. If any member has auth_user_id matching user.id
-      const linkedMember = user ? members.find((m: any) => m.auth_user_id === user.id) : null;
-      if (linkedMember) {
-        setCurrentMemberIdState(linkedMember.id);
-        localStorage.setItem(`tripmate_active_member_${slug}`, linkedMember.id);
-        return;
+      const linkedMember = user ? members.find(m => m.auth_user_id === user.id) : null;
+      if (!nextMemberId && linkedMember) {
+        nextMemberId = linkedMember.id;
       }
 
       // 4. Fallback to first member
-      setCurrentMemberIdState(members[0].id);
+      nextMemberId ??= members[0].id;
+      const memberIdToApply = nextMemberId;
+      queueMicrotask(() => {
+        setCurrentMemberIdState(memberIdToApply);
+        localStorage.setItem(`tripmate_active_member_${slug}`, memberIdToApply);
+      });
     }
   }, [members, slug, user, trip?.id]);
 

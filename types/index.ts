@@ -34,6 +34,7 @@ export interface Member {
   phone?: string | null;
   qr_code_url?: string | null;
   is_admin: boolean;
+  auth_user_id?: string | null;
   color: string | null;
   created_at: string;
   updated_at: string;

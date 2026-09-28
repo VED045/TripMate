@@ -59,8 +59,7 @@ export function JoinTripModal({
   // If initialSlug is given, search right away
   useEffect(() => {
     if (initialSlug && isOpen) {
-      setSlug(initialSlug);
-      fetchTrip(initialSlug);
+      queueMicrotask(() => { void fetchTrip(initialSlug); });
     }
   }, [initialSlug, isOpen]);
 
@@ -68,11 +67,11 @@ export function JoinTripModal({
   useEffect(() => {
     if (user && !newName) {
       const name = user.user_metadata?.full_name || user.email?.split('@')[0] || '';
-      if (name) setNewName(name);
+      if (name) queueMicrotask(() => setNewName(name));
     }
   }, [user]);
 
-  const fetchTrip = async (codeToSearch: string) => {
+  async function fetchTrip(codeToSearch: string) {
     const clean = codeToSearch.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
     if (!clean) return;
 
@@ -114,7 +113,7 @@ export function JoinTripModal({
     } finally {
       setIsSearching(false);
     }
-  };
+  }
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,11 +137,11 @@ export function JoinTripModal({
         const claimRes = await fetch(`/api/trips/${trip.slug}/claim`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: user.id, member_id: member.id }),
+          body: JSON.stringify({ member_id: member.id }),
         });
         if (!claimRes.ok) {
           const errData = await claimRes.json();
-          console.warn('Claim response warning:', errData);
+          throw new Error(errData.error || 'Could not link your identity');
         }
       }
 
@@ -154,9 +153,10 @@ export function JoinTripModal({
       toast.success(`You joined as ${member.name}!`);
       if (onJoined) onJoined(trip, member);
       onClose();
-      window.location.href = `/trip/${trip.slug}`;
-    } catch (err: any) {
-      toast.error(err.message || 'Error connecting to trip');
+      router.replace(`/trip/${trip.slug}`);
+      router.refresh();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error connecting to trip');
     } finally {
       setIsSubmitting(false);
     }
@@ -199,9 +199,10 @@ export function JoinTripModal({
       toast.success(`Welcome to ${trip.name}, ${newMember.name}!`);
       if (onJoined) onJoined(trip, newMember);
       onClose();
-      window.location.href = `/trip/${trip.slug}`;
-    } catch (err: any) {
-      toast.error(err.message || 'Error adding member');
+      router.replace(`/trip/${trip.slug}`);
+      router.refresh();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error adding member');
     } finally {
       setIsSubmitting(false);
     }

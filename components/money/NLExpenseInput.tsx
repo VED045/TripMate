@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { parseNLExpense } from '@/lib/ai/nlExpenseParser';
+import { extractJsonObject, generateLocalJson } from '@/lib/ai/localModel';
 import { formatCurrency } from '@/lib/currency';
 import type { Member } from '@/types';
 
@@ -45,9 +46,28 @@ export function NLExpenseInput({ members, currency = 'INR', onParsed, onClose }:
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
 
-  const handleParse = () => {
+  const handleParse = async () => {
     if (!text.trim()) return;
     const parsed = parseNLExpense(text, members);
+    try {
+      const response = await generateLocalJson(
+        `Extract an expense proposal. Known members: ${members.map(m => m.name).join(', ')}. Return {"description":string,"amount":number,"payer":string|null,"participants":string[],"category":string|null}. Amount is the stated major currency amount; do not calculate, split, or invent values.`,
+        text,
+      );
+      const suggestion = response ? extractJsonObject(response) : null;
+      if (suggestion) {
+        const payerName = typeof suggestion.payer === 'string' ? suggestion.payer.toLowerCase() : '';
+        const member = members.find(m => m.name.toLowerCase() === payerName);
+        const suggestedParticipants = Array.isArray(suggestion.participants) ? suggestion.participants.filter((p): p is string => typeof p === 'string') : [];
+        const participants = suggestedParticipants.length ? members.filter(m => suggestedParticipants.some(p => p.toLowerCase() === m.name.toLowerCase())).map(m => m.id) : parsed.participantIds;
+        if (typeof suggestion.description === 'string' && suggestion.description.trim()) parsed.description = suggestion.description.trim();
+        if (typeof suggestion.amount === 'number' && Number.isFinite(suggestion.amount) && suggestion.amount > 0) parsed.amountPaise = Math.round(suggestion.amount * 100);
+        if (member) parsed.paidByMemberId = member.id;
+        if (participants.length) parsed.participantIds = participants;
+        if (typeof suggestion.category === 'string') parsed.categoryHint = suggestion.category.toLowerCase();
+        parsed.confidence = Math.max(parsed.confidence, 0.7);
+      }
+    } catch { /* Manual parsing remains the safe fallback. */ }
     setResult(parsed);
   };
 
@@ -173,7 +193,7 @@ export function NLExpenseInput({ members, currency = 'INR', onParsed, onClose }:
               id="nl-expense-input"
               value={text}
               onChange={e => { setText(e.target.value); setResult(null); }}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleParse(); } }}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void handleParse(); } }}
               placeholder="e.g. Omkar paid ₹2400 for dinner, split equally"
               rows={3}
               className="w-full inset-field px-4 py-3 text-sm resize-none pr-12 font-[var(--font-sans)]"
@@ -195,7 +215,7 @@ export function NLExpenseInput({ members, currency = 'INR', onParsed, onClose }:
           </div>
 
           <button
-            onClick={handleParse}
+            onClick={() => void handleParse()}
             disabled={!text.trim()}
             className="w-full py-2.5 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 disabled:opacity-50 transition-all active:scale-[0.98]"
             style={{ background: 'linear-gradient(135deg, #7c3aed, #6d28d9)' }}

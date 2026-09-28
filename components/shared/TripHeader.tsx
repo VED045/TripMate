@@ -34,6 +34,7 @@ export function TripHeader({
   showMemberPicker = true,
   className,
 }: TripHeaderProps) {
+  const errorMessage = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
   const router = useRouter();
   const { trip, members, currentMember, setCurrentMemberId } = useActiveTrip();
   const { user, signOut } = useAuth();
@@ -41,11 +42,14 @@ export function TripHeader({
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const authMenuRef = useRef<HTMLDivElement>(null);
 
-  const userClaim = user?.user_metadata?.claimed_trips?.find(
-    (t: any) => t.trip_id === trip?.id || t.slug === trip?.slug || t.trip_slug === trip?.slug
-  );
+  const claimedTrips = user?.user_metadata?.claimed_trips;
+  const userClaim = Array.isArray(claimedTrips) ? claimedTrips.find((entry) => {
+    if (!entry || typeof entry !== 'object') return false;
+    const claim = entry as { trip_id?: string; slug?: string; trip_slug?: string };
+    return claim.trip_id === trip?.id || claim.slug === trip?.slug || claim.trip_slug === trip?.slug;
+  }) : null;
   const isLinkedUser = Boolean(
-    user && (userClaim || members.some((m: any) => m.auth_user_id === user.id))
+    user && (userClaim || members.some(m => m.auth_user_id === user.id))
   );
   const isCreator = Boolean(
     currentMember?.is_admin ||
@@ -80,8 +84,8 @@ export function TripHeader({
         await navigator.clipboard.writeText(url);
         toast.success('Trip link copied to clipboard!');
       }
-    } catch (err: any) {
-      if (err?.name === 'AbortError') return;
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       try {
         await navigator.clipboard.writeText(url);
         toast.success('Trip link copied to clipboard!');
@@ -272,7 +276,7 @@ export function TripHeader({
                           Trip Quick Actions
                         </p>
 
-                        <button
+                        {!isLinkedUser && <button
                           type="button"
                           onClick={() => {
                             setShowAuthMenu(false);
@@ -281,8 +285,8 @@ export function TripHeader({
                           className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-inset)] transition-all w-full text-left cursor-pointer"
                         >
                           <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
-                          <span>Switch or Link Identity</span>
-                        </button>
+                          <span>Link identity to this trip</span>
+                        </button>}
 
                         <Link
                           href={`/trip/${trip.slug}/profile`}
@@ -339,8 +343,8 @@ export function TripHeader({
                           await signOut();
                           toast.success('Signed out successfully');
                           router.push('/');
-                        } catch (err: any) {
-                          toast.error(err.message || 'Failed to sign out');
+                        } catch (err: unknown) {
+                          toast.error(errorMessage(err, 'Failed to sign out'));
                         }
                       }}
                       className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-500 hover:bg-rose-500/10 transition-all w-full text-left cursor-pointer"

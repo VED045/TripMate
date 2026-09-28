@@ -25,7 +25,6 @@ import {
   Bell,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/AuthContext';
-import { createClient } from '@/lib/supabase/client';
 import { formatCurrencyWithCode } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -53,7 +52,6 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user, isLoading: authLoading, signOut } = useAuth();
   const [trips, setTrips] = useState<TripSummary[]>([]);
-  const [profile, setProfile] = useState<{ display_name?: string; avatar_url?: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
@@ -64,8 +62,6 @@ export default function DashboardPage() {
     activeTripCount: 0,
   });
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
-
-  const supabase = createClient();
 
   const fetchDashboardData = useCallback(async () => {
     if (!user) return;
@@ -94,8 +90,8 @@ export default function DashboardPage() {
       router.replace('/login');
       return;
     }
-    if (user) fetchDashboardData();
-  }, [user, authLoading]);
+    if (user) queueMicrotask(() => { void fetchDashboardData(); });
+  }, [user, authLoading, router, fetchDashboardData]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -103,7 +99,8 @@ export default function DashboardPage() {
     toast.success('Signed out successfully');
   };
 
-  const displayName = profile?.display_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Traveler';
+  const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Traveler';
+  const primaryTrip = trips.find(trip => trip.status === 'active') ?? trips[0] ?? null;
 
   const filteredTrips = trips.filter(trip => {
     const matchesSearch = trip.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -204,6 +201,26 @@ export default function DashboardPage() {
             ))}
           </div>
         </motion.div>
+
+        {primaryTrip && (
+          <section className="raised-card p-4 sm:p-5 overflow-hidden relative" aria-label="Continue your trip">
+            <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-[var(--accent)] opacity-[0.07]" />
+            <div className="relative flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+              <div className="min-w-0">
+                <p className="text-[10px] font-mono uppercase tracking-widest font-bold text-[var(--accent)] mb-1">Continue your journey</p>
+                <h2 className="text-lg font-extrabold font-outfit text-[var(--text-primary)] truncate">{primaryTrip.name}</h2>
+                <p className="text-xs text-[var(--text-secondary)] mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                  <span className="inline-flex items-center gap-1"><Users className="w-3.5 h-3.5" /> {primaryTrip.member_count ?? 0} crew</span>
+                  <span className="inline-flex items-center gap-1"><Wallet className="w-3.5 h-3.5" /> {formatCurrencyWithCode(primaryTrip.total_paise ?? 0, primaryTrip.currency)}</span>
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Link prefetch href={`/trip/${primaryTrip.slug}/money`} className="px-3 py-2 rounded-xl text-xs font-bold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--surface-inset)]">Money</Link>
+                <Link prefetch href={`/trip/${primaryTrip.slug}`} className="px-4 py-2 rounded-xl text-xs font-bold text-white inline-flex items-center gap-1.5" style={{ background: 'var(--accent)' }}><TrendingUp className="w-3.5 h-3.5" /> Open trip</Link>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* My Trips Section */}
         <div className="space-y-4">

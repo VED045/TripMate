@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -70,6 +70,12 @@ export function BottomNav({ slug }: BottomNavProps) {
 
   const moreActive = moreItems.some((item) => pathname.startsWith(item.href));
 
+  // These routes are the next likely taps. Prefetching them while the current
+  // trip shell is idle keeps bottom-nav transitions feeling immediate.
+  useEffect(() => {
+    [...navItems, ...moreItems].forEach(item => router.prefetch(item.href));
+  }, [router, slug]);
+
   return (
     <>
       {/* More Menu Backdrop */}
@@ -113,6 +119,7 @@ export function BottomNav({ slug }: BottomNavProps) {
                   <Link
                     key={item.label}
                     href={item.href}
+                    prefetch
                     onClick={() => setShowMore(false)}
                     className={cn(
                       'flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-colors text-sm font-medium',
@@ -197,6 +204,7 @@ export function BottomNav({ slug }: BottomNavProps) {
               <Link
                 key={item.label}
                 href={item.href}
+                prefetch
                 id={`nav-${item.label.toLowerCase()}`}
                 className={cn(
                   'flex flex-col items-center justify-center py-1.5 px-3 rounded-2xl transition-all duration-200 min-w-[56px] touch-target relative group',

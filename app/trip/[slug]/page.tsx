@@ -110,7 +110,7 @@ export default function TripDashboardPage() {
       const res = await fetch(`/api/trips/${trip.slug}/claim`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user.id, member_id: claimMemberId }),
+        body: JSON.stringify({ member_id: claimMemberId }),
       });
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
