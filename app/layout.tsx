@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Toaster } from 'sonner';
 import { AuthProvider } from '@/lib/auth/AuthContext';
+import { ThemeProvider } from '@/components/shared/ThemeContext';
 
 export const metadata: Metadata = {
   title: 'TripMate — Group Travel & Expense OS',
@@ -58,7 +59,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <AuthProvider>
-          {children}
+          <ThemeProvider>{children}</ThemeProvider>
         </AuthProvider>
         <Toaster
           position="top-center"

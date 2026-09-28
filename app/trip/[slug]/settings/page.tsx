@@ -4,9 +4,6 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Settings,
-  Moon,
-  Sun,
-  Palette,
   Bell,
   Users,
   Download,
@@ -29,20 +26,11 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { SUPPORTED_CURRENCIES, CURRENCY_CONFIG, getCurrencySymbol } from '@/lib/currency';
 import { useAuth } from '@/lib/auth/AuthContext';
-import { LocalAiSettings } from '@/components/ai/LocalAiSettings';
 import { CustomSelect } from '@/components/ui/CustomSelect';
-
-type Theme = 'light' | 'dark';
-
-const THEME_OPTIONS: { value: Theme; label: string; icon: React.ElementType; desc: string }[] = [
-  { value: 'light', label: 'Light', icon: Sun, desc: 'Soft neumorphic light mode' },
-  { value: 'dark', label: 'Dark', icon: Moon, desc: 'Midnight dark mode' },
-];
 
 export default function SettingsPage() {
   const { trip, members, currentMember, refreshTrip } = useActiveTrip();
   const { user } = useAuth();
-  const [theme, setTheme] = useState<Theme>('light');
   const [tripName, setTripName] = useState(trip?.name || '');
   const [isEditingName, setIsEditingName] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -53,20 +41,9 @@ export default function SettingsPage() {
 
   // Read saved theme
   useEffect(() => {
-    const saved = localStorage.getItem('tripmate_theme') as Theme | null;
-    if (saved === 'light' || saved === 'dark') queueMicrotask(() => setTheme(saved));
     if (trip?.name) queueMicrotask(() => setTripName(trip.name));
     if (trip?.currency) queueMicrotask(() => setSelectedCurrency(trip.currency));
   }, [trip?.name, trip?.currency]);
-
-  const applyTheme = (t: Theme) => {
-    setTheme(t);
-    localStorage.setItem('tripmate_theme', t);
-
-    const root = document.documentElement;
-    root.setAttribute('data-theme', t);
-    toast.success(`Switched to ${t} mode`);
-  };
 
   const handleSaveTripName = async () => {
     if (!trip || !tripName.trim()) return;
@@ -196,11 +173,11 @@ export default function SettingsPage() {
               </p>
             </div>
             <Link
-              href={`/trip/${trip.slug}/profile`}
+              href="/dashboard/account"
               className="block w-full py-3 rounded-xl text-white font-bold text-xs shadow-md transition-all active:scale-95"
               style={{ background: 'linear-gradient(135deg, #2b56ff, #163ecf)' }}
             >
-              Go to My Profile & UPI QR Code
+              Open Profile &amp; Preferences
             </Link>
           </div>
         </div>
@@ -368,50 +345,6 @@ export default function SettingsPage() {
                 />
               </div>
             )}
-          </div>
-        </section>
-
-        <LocalAiSettings />
-
-        {/* Appearance */}
-        <section className="raised-card p-5 space-y-4">
-          <div className="flex items-center gap-2">
-            <Palette className="w-4 h-4 text-[var(--accent)]" />
-            <h2 className="text-sm font-bold font-outfit text-[var(--text-primary)]">Appearance</h2>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            {THEME_OPTIONS.map(({ value, label, icon: Icon, desc }) => {
-              const active = theme === value;
-              return (
-                <button
-                  key={value}
-                  onClick={() => applyTheme(value)}
-                  className={cn(
-                    'flex flex-col items-center gap-2 p-3 rounded-2xl border text-center transition-all',
-                    active
-                      ? 'border-[var(--accent)] bg-[var(--accent-subtle)]'
-                      : 'border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-inset)]'
-                  )}
-                >
-                  <div className={cn(
-                    'w-8 h-8 rounded-xl flex items-center justify-center',
-                    active ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'
-                  )}
-                    style={active ? { background: 'var(--accent-subtle)' } : { background: 'var(--surface-inset)' }}
-                  >
-                    <Icon className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className={cn('text-xs font-bold', active ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]')}>
-                      {label}
-                    </p>
-                    <p className="text-[9px] text-[var(--text-muted)] hidden sm:block">{desc}</p>
-                  </div>
-                  {active && <Check className="w-3 h-3 text-[var(--accent)]" />}
-                </button>
-              );
-            })}
           </div>
         </section>
 

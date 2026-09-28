@@ -204,13 +204,13 @@ export function TripHeader({
             <Share2 className="w-3.5 h-3.5" />
           </button>
 
-          {/* Quick Action: Profile & UPI (Desktop) */}
+          {/* Global profile and preferences (Desktop) */}
           {trip && (
             <Link
               id="trip-profile-link"
-              href={`/trip/${trip.slug}/profile`}
-              title="My Profile & UPI Code"
-              aria-label="My Profile & UPI Code"
+              href="/dashboard/account"
+              title="Profile & preferences"
+              aria-label="Profile & preferences"
               className="hidden sm:flex w-9 h-9 items-center justify-center rounded-xl bg-[var(--surface-raised)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-inset)] shadow-sm active:scale-95 transition-all flex-shrink-0"
             >
               <User className="w-3.5 h-3.5" />
@@ -289,12 +289,12 @@ export function TripHeader({
                         </button>}
 
                         <Link
-                          href={`/trip/${trip.slug}/profile`}
+                          href="/dashboard/account"
                           onClick={() => setShowAuthMenu(false)}
                           className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-inset)] transition-all sm:hidden"
                         >
                           <User className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
-                          <span>My Profile &amp; UPI Code</span>
+                          <span>Profile &amp; preferences</span>
                         </Link>
 
                         {isCreator && (

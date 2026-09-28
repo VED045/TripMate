@@ -24,10 +24,7 @@ import {
   ArrowDownLeft,
   MessageCircle,
   Phone,
-  Sun,
-  Moon,
 } from 'lucide-react';
-import { useTheme } from '@/components/shared/ThemeContext';
 import { useActiveTrip } from '@/components/shared/ActiveTripContext';
 import { TripHeader } from '@/components/shared/TripHeader';
 import { Avatar } from '@/components/ui/Avatar';
@@ -47,7 +44,6 @@ const COLOR_PALETTE = [
 
 export default function ProfilePage() {
   const { trip, members, currentMember, refreshTrip } = useActiveTrip();
-  const { theme, toggleTheme } = useTheme();
 
   const [name, setName] = useState('');
   const [upiId, setUpiId] = useState('');
@@ -64,10 +60,12 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (currentMember) {
-      setName(currentMember.name || '');
-      setUpiId(currentMember.upi_id || '');
-      setPhone(currentMember.phone || '');
-      setSelectedColor(currentMember.color || COLOR_PALETTE[0]);
+      queueMicrotask(() => {
+        setName(currentMember.name || '');
+        setUpiId(currentMember.upi_id || '');
+        setPhone(currentMember.phone || '');
+        setSelectedColor(currentMember.color || COLOR_PALETTE[0]);
+      });
     }
   }, [currentMember]);
 
@@ -271,7 +269,7 @@ export default function ProfilePage() {
 
   return (
     <div className="flex-1 flex flex-col" style={{ background: 'var(--background)' }}>
-      <TripHeader title="My Profile" subtitle="Manage your personal details & UPI QR Code" />
+      <TripHeader title="Trip payment profile" subtitle="Manage the payment details used in this trip" />
 
       <div className="max-w-3xl mx-auto w-full px-4 md:px-6 py-6 space-y-6 pb-nav">
 
@@ -410,65 +408,6 @@ export default function ProfilePage() {
             </button>
           </div>
         </form>
-
-        {/* App Theme & Appearance Mode Card */}
-        <div className="raised-card p-5 sm:p-6 space-y-4">
-          <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
-            <h3 className="text-sm font-extrabold font-outfit uppercase tracking-wider text-[var(--text-primary)] flex items-center gap-2">
-              {theme === 'dark' ? (
-                <Moon className="w-4 h-4 text-indigo-400" />
-              ) : (
-                <Sun className="w-4 h-4 text-amber-500" />
-              )}
-              App Appearance & Theme Mode
-            </h3>
-            <Badge variant={theme === 'dark' ? 'info' : 'warning'} size="xs">
-              {theme === 'dark' ? '🌙 Dark Mode' : '☀️ Light Mode'}
-            </Badge>
-          </div>
-
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-[var(--surface-inset)] border border-[var(--border)]">
-            <div>
-              <h4 className="text-xs font-bold text-[var(--text-primary)] font-outfit">
-                Display Theme Mode
-              </h4>
-              <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                Switch between soft light mode and dark mode across all trip pages. Available for all crew members.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 p-1.5 rounded-xl bg-[var(--surface-raised)] border border-[var(--border)] shrink-0 shadow-inner">
-              <button
-                type="button"
-                onClick={() => {
-                  if (theme !== 'light') toggleTheme();
-                }}
-                className={cn(
-                  'flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all active:scale-95',
-                  theme === 'light'
-                    ? 'bg-amber-500 text-white shadow-md'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-inset)]'
-                )}
-              >
-                <Sun className="w-4 h-4" /> Light
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (theme !== 'dark') toggleTheme();
-                }}
-                className={cn(
-                  'flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all active:scale-95',
-                  theme === 'dark'
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-inset)]'
-                )}
-              >
-                <Moon className="w-4 h-4" /> Dark
-              </button>
-            </div>
-          </div>
-        </div>
 
         {/* Personal QR Code Manager Card */}
         <div className="raised-card p-5 sm:p-6 space-y-4">
