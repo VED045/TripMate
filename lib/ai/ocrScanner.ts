@@ -1,5 +1,6 @@
 import { createWorker } from 'tesseract.js';
 import type { ItemFormRow } from '@/types';
+import { extractJsonObject, generateLocalJsonWithStatus } from '@/lib/ai/localModel';
 
 export interface OcrResult {
   merchant?: string;
@@ -9,6 +10,8 @@ export interface OcrResult {
   items: ItemFormRow[];
   rawText: string;
   confidence: number;
+  aiAssisted?: boolean;
+  missingFields?: string[];
 }
 
 /**
@@ -31,7 +34,60 @@ export async function scanReceiptImage(imageSource: File | Blob | string): Promi
     }
   }
 
-  return parseReceiptText(rawText);
+  const parsed = parseReceiptText(rawText);
+  return refineReceiptWithLocalAi(parsed);
+}
+
+async function refineReceiptWithLocalAi(parsed: OcrResult): Promise<OcrResult> {
+  if (!parsed.rawText.trim()) return parsed;
+  try {
+    const generation = await generateLocalJsonWithStatus(
+      'Read this OCR text from an Indian receipt. Extract only values actually present. Return {"merchant":string|null,"subtotal":number|null,"gstPercent":number|null,"total":number|null,"items":[{"name":string,"quantity":number,"unitPrice":number}]}. Do not invent an item, amount, tax, or total. Item unitPrice must be the per-item price, not the line total.',
+      parsed.rawText,
+    );
+    const suggestion = generation.text ? extractJsonObject(generation.text) : null;
+    if (!suggestion || !generation.tier) return parsed;
+
+    const numberValue = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+    const itemRows = Array.isArray(suggestion.items)
+      ? suggestion.items.flatMap((item, index) => {
+          if (!item || typeof item !== 'object') return [];
+          const row = item as Record<string, unknown>;
+          const name = typeof row.name === 'string' ? row.name.trim() : '';
+          const quantity = numberValue(row.quantity);
+          const unitPrice = numberValue(row.unitPrice);
+          if (!name || !quantity || !unitPrice) return [];
+          return [{ id: `ai-${index}-${crypto.randomUUID()}`, name, quantity, unitPriceRupees: unitPrice, gstRatePercent: 0, assignments: [] } satisfies ItemFormRow];
+        })
+      : [];
+    const suggestedTotal = numberValue(suggestion.total);
+    const suggestedSubtotal = numberValue(suggestion.subtotal);
+    // Only let AI fill a missing number. Receipt totals remain grounded in OCR/rules.
+    const nextItems = parsed.items.length > 0 ? parsed.items : itemRows;
+    const nextSubtotal = parsed.subtotal > 0 ? parsed.subtotal : (suggestedSubtotal ?? nextItems.reduce((sum, item) => sum + item.quantity * item.unitPriceRupees, 0));
+    const nextTotal = parsed.total > 0 ? parsed.total : (suggestedTotal ?? nextSubtotal);
+    const nextMerchant = parsed.merchant || (typeof suggestion.merchant === 'string' ? suggestion.merchant.trim() || undefined : undefined);
+    const nextGst = parsed.gstPercent || numberValue(suggestion.gstPercent) || 0;
+    const missingFields = [
+      !nextMerchant && 'merchant',
+      !nextTotal && 'total',
+      nextItems.length === 0 && 'line items',
+    ].filter(Boolean) as string[];
+
+    return {
+      ...parsed,
+      merchant: nextMerchant,
+      subtotal: nextSubtotal,
+      total: nextTotal,
+      gstPercent: nextGst,
+      items: nextItems,
+      confidence: Math.min(0.95, Math.max(parsed.confidence, nextItems.length ? 0.78 : 0.55)),
+      aiAssisted: true,
+      missingFields,
+    };
+  } catch {
+    return parsed;
+  }
 }
 
 /**
@@ -120,6 +176,12 @@ export function parseReceiptText(text: string): OcrResult {
     detectedTotal = detectedSubtotal + (detectedSubtotal * detectedGstPercent) / 100;
   }
 
+  const missingFields = [
+    !merchant && 'merchant',
+    !detectedTotal && 'total',
+    items.length === 0 && 'line items',
+  ].filter(Boolean) as string[];
+
   return {
     merchant: merchant.length > 2 ? merchant : undefined,
     subtotal: detectedSubtotal,
@@ -128,5 +190,6 @@ export function parseReceiptText(text: string): OcrResult {
     items,
     rawText: text,
     confidence: items.length > 0 ? 0.8 : 0.4,
+    missingFields,
   };
 }

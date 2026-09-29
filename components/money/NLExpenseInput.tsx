@@ -7,14 +7,13 @@ import {
   X,
   Mic,
   Send,
-  ChevronRight,
   AlertCircle,
   CheckCircle2,
   Lightbulb,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { parseNLExpense } from '@/lib/ai/nlExpenseParser';
-import { extractJsonObject, generateLocalJson } from '@/lib/ai/localModel';
+import { extractJsonObject, generateLocalJsonWithStatus, type LocalAiTier } from '@/lib/ai/localModel';
 import { formatCurrency } from '@/lib/currency';
 import type { Member } from '@/types';
 
@@ -39,40 +38,64 @@ const EXAMPLE_PROMPTS = [
   'Paid ₹500 for groceries, all of us',
 ];
 
+type SpeechRecognitionInstance = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
+
 export function NLExpenseInput({ members, currency = 'INR', onParsed, onClose }: NLExpenseInputProps) {
   const [text, setText] = useState('');
   const [result, setResult] = useState<ReturnType<typeof parseNLExpense> | null>(null);
   const [isListening, setIsListening] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
+  const [aiTierUsed, setAiTierUsed] = useState<LocalAiTier | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
-  const handleParse = async () => {
-    if (!text.trim()) return;
-    const parsed = parseNLExpense(text, members);
+  const parseInput = async (input: string) => {
+    if (!input.trim()) return;
+    const parsed = parseNLExpense(input, members);
+    setIsParsing(true);
+    setAiTierUsed(null);
     try {
-      const response = await generateLocalJson(
+      const generation = await generateLocalJsonWithStatus(
         `Extract an expense proposal. Known members: ${members.map(m => m.name).join(', ')}. Return {"description":string,"amount":number,"payer":string|null,"participants":string[],"category":string|null}. Amount is the stated major currency amount; do not calculate, split, or invent values.`,
-        text,
+        input,
       );
-      const suggestion = response ? extractJsonObject(response) : null;
+      setAiTierUsed(generation.tier);
+      const suggestion = generation.text ? extractJsonObject(generation.text) : null;
       if (suggestion) {
         const payerName = typeof suggestion.payer === 'string' ? suggestion.payer.toLowerCase() : '';
         const member = members.find(m => m.name.toLowerCase() === payerName);
         const suggestedParticipants = Array.isArray(suggestion.participants) ? suggestion.participants.filter((p): p is string => typeof p === 'string') : [];
         const participants = suggestedParticipants.length ? members.filter(m => suggestedParticipants.some(p => p.toLowerCase() === m.name.toLowerCase())).map(m => m.id) : parsed.participantIds;
         if (typeof suggestion.description === 'string' && suggestion.description.trim()) parsed.description = suggestion.description.trim();
-        if (typeof suggestion.amount === 'number' && Number.isFinite(suggestion.amount) && suggestion.amount > 0) parsed.amountPaise = Math.round(suggestion.amount * 100);
+        if (parsed.amountPaise === 0 && typeof suggestion.amount === 'number' && Number.isFinite(suggestion.amount) && suggestion.amount > 0) parsed.amountPaise = Math.round(suggestion.amount * 100);
         if (member) parsed.paidByMemberId = member.id;
         if (participants.length) parsed.participantIds = participants;
         if (typeof suggestion.category === 'string') parsed.categoryHint = suggestion.category.toLowerCase();
         parsed.confidence = Math.max(parsed.confidence, 0.7);
       }
     } catch { /* Manual parsing remains the safe fallback. */ }
+    finally { setIsParsing(false); }
     setResult(parsed);
   };
 
+  const handleParse = async () => parseInput(text);
+
   const handleStartVoice = () => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const speechWindow = window as Window & {
+      SpeechRecognition?: SpeechRecognitionConstructor;
+      webkitSpeechRecognition?: SpeechRecognitionConstructor;
+    };
+    const SpeechRecognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       alert('Voice input is not supported in this browser. Try Chrome.');
       return;
@@ -85,14 +108,10 @@ export function NLExpenseInput({ members, currency = 'INR', onParsed, onClose }:
 
     recognition.onstart = () => setIsListening(true);
     recognition.onend = () => setIsListening(false);
-    recognition.onresult = (event: any) => {
+    recognition.onresult = event => {
       const transcript = event.results[0][0].transcript;
       setText(transcript);
-      // Auto-parse after voice
-      setTimeout(() => {
-        const parsed = parseNLExpense(transcript, members);
-        setResult(parsed);
-      }, 100);
+      void parseInput(transcript);
     };
 
     recognitionRef.current = recognition;
@@ -212,16 +231,17 @@ export function NLExpenseInput({ members, currency = 'INR', onParsed, onClose }:
             >
               <Mic className="w-4 h-4" />
             </button>
+            {isListening && <p className="mt-1 text-[10px] font-medium text-rose-500">Listening… Speak the amount, who paid, and who shares it.</p>}
           </div>
 
           <button
             onClick={() => void handleParse()}
-            disabled={!text.trim()}
+            disabled={!text.trim() || isParsing}
             className="w-full py-2.5 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 disabled:opacity-50 transition-all active:scale-[0.98]"
             style={{ background: 'linear-gradient(135deg, #7c3aed, #6d28d9)' }}
           >
             <Sparkles className="w-4 h-4" />
-            Parse Expense
+            {isParsing ? 'Checking details…' : 'Parse Expense'}
             <Send className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -237,10 +257,19 @@ export function NLExpenseInput({ members, currency = 'INR', onParsed, onClose }:
             >
               <div className="flex items-center justify-between">
                 <p className="text-xs font-bold text-[var(--text-primary)] font-outfit">Parsed Result</p>
-                <span className={cn('text-[10px] font-bold font-mono', confidenceColor)}>
-                  {Math.round((result.confidence || 0) * 100)}% confident
-                </span>
+                <div className="flex items-center gap-2">
+                  {aiTierUsed && <span className="text-[10px] font-bold font-mono text-violet-600 dark:text-violet-400">On-device AI · {aiTierUsed === 'enhanced' ? '1.5B' : '0.5B'}</span>}
+                  <span className={cn('text-[10px] font-bold font-mono', confidenceColor)}>
+                    {Math.round((result.confidence || 0) * 100)}% confident
+                  </span>
+                </div>
               </div>
+
+              {aiTierUsed ? (
+                <p className="text-[10px] text-[var(--text-muted)]">Your downloaded on-device model refined this suggestion. Review it before saving.</p>
+              ) : (
+                <p className="text-[10px] text-[var(--text-muted)]">Using the fast on-device rules. Download a local model in Profile &amp; preferences for an AI refinement pass.</p>
+              )}
 
               <div className="p-3 rounded-xl border border-[var(--border)] space-y-2.5"
                 style={{ background: 'var(--surface-inset)' }}>
@@ -293,7 +322,20 @@ export function NLExpenseInput({ members, currency = 'INR', onParsed, onClose }:
                 <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
                   <AlertCircle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
                   <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-relaxed">
-                    Low confidence — some fields weren't detected. The form will be pre-filled but please review before saving.
+                    Low confidence — some fields weren&apos;t detected. The form will be pre-filled but please review before saving.
+                  </p>
+                </div>
+              )}
+
+              {(!result.description || !result.amountPaise || !result.paidByMemberId) && (
+                <div className="flex items-start gap-2 p-2.5 rounded-lg bg-violet-500/10 border border-violet-500/25">
+                  <AlertCircle className="w-3.5 h-3.5 text-violet-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-violet-700 dark:text-violet-300 leading-relaxed">
+                    Please confirm {[
+                      !result.description && 'what this expense was for',
+                      !result.amountPaise && 'the total amount',
+                      !result.paidByMemberId && 'who paid',
+                    ].filter(Boolean).join(', ')} before saving.
                   </p>
                 </div>
               )}

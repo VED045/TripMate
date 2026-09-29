@@ -7,27 +7,21 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
   Wallet,
-  Camera,
   TrendingUp,
   Users,
   Clock,
   MapPin,
   ChevronRight,
   LogOut,
-  Settings,
-  Archive,
   Search,
-  Star,
   Sparkles,
   Globe,
   User,
-  Bell,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { formatCurrencyWithCode } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { Avatar } from '@/components/ui/Avatar';
 import { JoinTripModal } from '@/components/trip/JoinTripModal';
 import { TripMateMark } from '@/components/shared/TripMateMark';
 
@@ -43,6 +37,7 @@ interface TripSummary {
   created_at: string;
   member_count?: number;
   total_paise?: number;
+  my_spent_paise?: number;
   user_role?: string;
 }
 
@@ -57,7 +52,8 @@ export default function DashboardPage() {
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
   const [totalStats, setTotalStats] = useState({
     totalTrips: 0,
-    totalSpent: 0,
+    mySpent: 0,
+    totalTripSpend: 0,
     currency: 'INR',
     activeTripCount: 0,
   });
@@ -183,7 +179,7 @@ export default function DashboardPage() {
             {[
               { label: 'Total Trips', value: totalStats.totalTrips, icon: '✈️', color: 'var(--accent)' },
               { label: 'Active Trips', value: totalStats.activeTripCount, icon: '🔥', color: 'var(--success)' },
-              { label: 'Total Spent', value: formatCurrencyWithCode(totalStats.totalSpent, totalStats.currency), icon: '💰', color: '#f97316', isString: true },
+              { label: 'My Spend', value: formatCurrencyWithCode(totalStats.mySpent, totalStats.currency), icon: '💰', color: '#f97316', isString: true },
             ].map((stat, i) => (
               <motion.div
                 key={stat.label}
@@ -211,7 +207,8 @@ export default function DashboardPage() {
                 <h2 className="text-lg font-extrabold font-outfit text-[var(--text-primary)] truncate">{primaryTrip.name}</h2>
                 <p className="text-xs text-[var(--text-secondary)] mt-1 flex flex-wrap gap-x-3 gap-y-1">
                   <span className="inline-flex items-center gap-1"><Users className="w-3.5 h-3.5" /> {primaryTrip.member_count ?? 0} crew</span>
-                  <span className="inline-flex items-center gap-1"><Wallet className="w-3.5 h-3.5" /> {formatCurrencyWithCode(primaryTrip.total_paise ?? 0, primaryTrip.currency)}</span>
+                  <span className="inline-flex items-center gap-1"><Wallet className="w-3.5 h-3.5" /> You paid {formatCurrencyWithCode(primaryTrip.my_spent_paise ?? 0, primaryTrip.currency)}</span>
+                  <span className="inline-flex items-center gap-1 text-[var(--text-muted)]">Trip total {formatCurrencyWithCode(primaryTrip.total_paise ?? 0, primaryTrip.currency)}</span>
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -343,7 +340,7 @@ export default function DashboardPage() {
                           </span>
                           <span className="flex items-center gap-1">
                             <Wallet className="w-3 h-3" />
-                            {formatCurrencyWithCode(trip.total_paise || 0, trip.currency)}
+                            You paid {formatCurrencyWithCode(trip.my_spent_paise || 0, trip.currency)}
                           </span>
                           {trip.start_date && (
                             <span className="flex items-center gap-1">

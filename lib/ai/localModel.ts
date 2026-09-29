@@ -46,6 +46,11 @@ export interface LocalAiStatus {
   downloaded: Record<LocalAiTier, boolean>;
 }
 
+export interface LocalAiGeneration {
+  text: string | null;
+  tier: LocalAiTier | null;
+}
+
 type Transformers = typeof import('@huggingface/transformers');
 type TextGenerator = (messages: Array<{ role: string; content: string }>, options: { max_new_tokens: number; do_sample: boolean; temperature: number }) => Promise<Array<{ generated_text: Array<{ content: string }> }>>;
 
@@ -176,34 +181,51 @@ export async function getDownloadedTier(): Promise<LocalAiTier | null> {
   return status.downloaded.enhanced ? 'enhanced' : status.downloaded.standard ? 'standard' : null;
 }
 
-export async function generateLocalJson(
+export async function generateLocalJsonWithStatus(
   instructions: string,
   input: string,
-): Promise<string | null> {
-  const tier = await getDownloadedTier();
-  if (!tier) return null;
+): Promise<LocalAiGeneration> {
+  const preferredTier = await getDownloadedTier();
+  if (!preferredTier) return { text: null, tier: null };
 
   const transformers = await getTransformers();
-  const model = LOCAL_AI_MODELS[tier];
-  let generator = loadedPipelines.get(tier) as TextGenerator | undefined;
+  const tiers: LocalAiTier[] = preferredTier === 'enhanced' ? ['enhanced', 'standard'] : ['standard'];
 
-  if (!generator) {
-    const device = typeof navigator !== 'undefined' && 'gpu' in navigator ? 'webgpu' : 'wasm';
+  for (const tier of tiers) {
+    if (localStorage.getItem(storageKey(tier)) !== 'ready') continue;
+    const model = LOCAL_AI_MODELS[tier];
+    let generator = loadedPipelines.get(tier) as TextGenerator | undefined;
     try {
-      generator = await transformers.pipeline('text-generation', model.modelId, { dtype: model.dtype, device }) as unknown as TextGenerator;
-    } catch {
-      generator = await transformers.pipeline('text-generation', model.modelId, { dtype: model.dtype, device: 'wasm' }) as unknown as TextGenerator;
+      if (!generator) {
+        const device = await getWorkingWebGpu() ? 'webgpu' : 'wasm';
+        try {
+          generator = await transformers.pipeline('text-generation', model.modelId, { dtype: model.dtype, device }) as unknown as TextGenerator;
+        } catch {
+          generator = await transformers.pipeline('text-generation', model.modelId, { dtype: model.dtype, device: 'wasm' }) as unknown as TextGenerator;
+        }
+        loadedPipelines.set(tier, generator);
+      }
+
+      const output = await generator([
+        { role: 'system', content: `${instructions}\nReturn only valid JSON. Never calculate financial totals.` },
+        { role: 'user', content: input },
+      ], { max_new_tokens: 220, do_sample: false, temperature: 0 });
+
+      const generated = output[0]?.generated_text;
+      return { text: Array.isArray(generated) ? generated.at(-1)?.content ?? null : null, tier };
+    } catch (error) {
+      console.warn(`[local-ai] ${tier} generation failed; trying a compatible downloaded model if available.`, error);
+      loadedPipelines.delete(tier);
+      // A previously cached model can become unusable after a browser/runtime update.
+      // Keep its files so the user can retry, but allow Standard to handle this request.
     }
-    loadedPipelines.set(tier, generator);
   }
 
-  const output = await generator([
-    { role: 'system', content: `${instructions}\nReturn only valid JSON. Never calculate financial totals.` },
-    { role: 'user', content: input },
-  ], { max_new_tokens: 220, do_sample: false, temperature: 0 });
+  return { text: null, tier: null };
+}
 
-  const generated = output[0]?.generated_text;
-  return Array.isArray(generated) ? generated.at(-1)?.content ?? null : null;
+export async function generateLocalJson(instructions: string, input: string): Promise<string | null> {
+  return (await generateLocalJsonWithStatus(instructions, input)).text;
 }
 
 export function extractJsonObject(value: string): Record<string, unknown> | null {

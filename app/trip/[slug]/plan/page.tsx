@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   CalendarDays,
+  CalendarPlus,
   Check,
   ClipboardList,
   MapPin,
@@ -14,6 +15,9 @@ import {
   X,
   ChevronDown,
   Sparkles,
+  Download,
+  ExternalLink,
+  Wand2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { TripHeader } from '@/components/shared/TripHeader';
@@ -42,6 +46,42 @@ type PackingItem = {
   created_by?: string | null;
   created_at: string;
 };
+
+const ITINERARY_TEMPLATES = [
+  {
+    label: 'Arrival day',
+    description: 'Check-in, a quick local walk, and dinner.',
+    items: [
+      { title: 'Check in', details: 'Confirm the reservation and drop bags.' },
+      { title: 'Explore nearby', details: 'Keep this flexible after the journey.' },
+      { title: 'Welcome dinner', details: 'Pick a relaxed first-night spot.' },
+    ],
+  },
+  {
+    label: 'Adventure day',
+    description: 'A balanced full day with recovery time.',
+    items: [
+      { title: 'Breakfast & briefing', details: 'Confirm timings, tickets, and essentials.' },
+      { title: 'Main activity', details: 'Add the venue and booking reference when ready.' },
+      { title: 'Sunset / wind-down', details: 'Leave room for photos and a relaxed finish.' },
+    ],
+  },
+  {
+    label: 'Departure day',
+    description: 'A calm checklist before heading home.',
+    items: [
+      { title: 'Pack & room check', details: 'Check chargers, valuables, and shared items.' },
+      { title: 'Check out', details: 'Confirm luggage storage or transport if needed.' },
+      { title: 'Travel to departure point', details: 'Allow extra buffer time for the crew.' },
+    ],
+  },
+] as const;
+
+const PACKING_TEMPLATES = [
+  { label: 'Beach essentials', items: ['Sunscreen', 'Beach towel', 'Water bottle', 'Flip-flops'] },
+  { label: 'Road-trip kit', items: ['Power bank', 'First-aid kit', 'Car charger', 'Snacks'] },
+  { label: 'Stay basics', items: ['ID / booking proof', 'Toiletries', 'Phone charger', 'Medicines'] },
+] as const;
 
 function formatItineraryTime(isoString: string | null) {
   if (!isoString) return null;
@@ -73,6 +113,24 @@ function toDatetimeLocal(isoString: string | null) {
   }
 }
 
+function googleCalendarUrl(item: ItineraryItem) {
+  if (!item.starts_at) return null;
+  const start = new Date(item.starts_at);
+  if (Number.isNaN(start.getTime())) return null;
+  const end = item.ends_at && !Number.isNaN(new Date(item.ends_at).getTime())
+    ? new Date(item.ends_at)
+    : new Date(start.getTime() + 60 * 60 * 1000);
+  const toGoogleDate = (date: Date) => date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: item.title,
+    dates: `${toGoogleDate(start)}/${toGoogleDate(end)}`,
+    details: item.details || 'Added from TripMate',
+    ...(item.location_name ? { location: item.location_name } : {}),
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
 export default function PlanPage() {
   const { trip, members, currentMember } = useActiveTrip();
   const [itinerary, setItinerary] = useState<ItineraryItem[]>([]);
@@ -86,6 +144,10 @@ export default function PlanPage() {
   const [newItineraryTime, setNewItineraryTime] = useState('');
   const [newItineraryDetails, setNewItineraryDetails] = useState('');
   const [isSubmittingItinerary, setIsSubmittingItinerary] = useState(false);
+  const [applyingTemplate, setApplyingTemplate] = useState<string | null>(null);
+  const [applyingPackingTemplate, setApplyingPackingTemplate] = useState<string | null>(null);
+  const [itineraryQuery, setItineraryQuery] = useState('');
+  const [calendarReminderMinutes, setCalendarReminderMinutes] = useState(30);
 
   // Itinerary Item Edit State
   const [editingItineraryId, setEditingItineraryId] = useState<string | null>(null);
@@ -245,6 +307,92 @@ export default function PlanPage() {
     }
   };
 
+  const applyItineraryTemplate = async (template: (typeof ITINERARY_TEMPLATES)[number]) => {
+    if (!trip) return;
+
+    try {
+      setApplyingTemplate(template.label);
+      const responses = await Promise.all(
+        template.items.map(item =>
+          fetch('/api/planning', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              trip_id: trip.id,
+              kind: 'itinerary',
+              title: item.title,
+              details: item.details,
+              member_id: currentMember?.id || null,
+            }),
+          })
+        )
+      );
+
+      if (responses.some(response => !response.ok)) {
+        throw new Error('Could not add every suggested stop');
+      }
+
+      toast.success(`${template.label} template added`);
+      await loadData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not apply template');
+      await loadData();
+    } finally {
+      setApplyingTemplate(null);
+    }
+  };
+
+  const exportItineraryCalendar = () => {
+    const currentTrip = trip;
+    if (!currentTrip) return;
+    const scheduledStops = itinerary.filter(item => item.starts_at && !Number.isNaN(new Date(item.starts_at).getTime()));
+    if (scheduledStops.length === 0) {
+      toast.error('Add a date and time to at least one stop before exporting a calendar');
+      return;
+    }
+
+    const escapeIcsText = (value: string) =>
+      value.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+    const toIcsDate = (date: Date) => date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+    const generatedAt = toIcsDate(new Date());
+    const events = scheduledStops.flatMap(item => {
+      const start = new Date(item.starts_at!);
+      const end = item.ends_at && !Number.isNaN(new Date(item.ends_at).getTime())
+        ? new Date(item.ends_at)
+        : new Date(start.getTime() + 60 * 60 * 1000);
+      const description = [item.details, item.location_name ? `Location: ${item.location_name}` : null]
+        .filter(Boolean)
+        .join('\n');
+
+      return [
+        'BEGIN:VEVENT',
+        `UID:${item.id}@tripmate`,
+        `DTSTAMP:${generatedAt}`,
+        `DTSTART:${toIcsDate(start)}`,
+        `DTEND:${toIcsDate(end)}`,
+        `SUMMARY:${escapeIcsText(item.title)}`,
+        ...(description ? [`DESCRIPTION:${escapeIcsText(description)}`] : []),
+        ...(item.location_name ? [`LOCATION:${escapeIcsText(item.location_name)}`] : []),
+        'BEGIN:VALARM',
+        `TRIGGER:-PT${calendarReminderMinutes}M`,
+        'ACTION:DISPLAY',
+        `DESCRIPTION:${escapeIcsText(item.title)}`,
+        'END:VALARM',
+        'END:VEVENT',
+      ];
+    });
+    const calendar = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//TripMate//Itinerary//EN', 'CALSCALE:GREGORIAN', ...events, 'END:VCALENDAR'].join('\r\n');
+    const href = URL.createObjectURL(new Blob([calendar], { type: 'text/calendar;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = href;
+    link.download = `${currentTrip.slug || 'tripmate'}-itinerary.ics`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(href), 0);
+    toast.success('Calendar file downloaded');
+  };
+
   // ==========================================
   // PACKING HANDLERS (Personal & shared checkoff)
   // ==========================================
@@ -380,6 +528,32 @@ export default function PlanPage() {
     }
   };
 
+  const applyPackingTemplate = async (template: (typeof PACKING_TEMPLATES)[number]) => {
+    if (!trip) return;
+    try {
+      setApplyingPackingTemplate(template.label);
+      const responses = await Promise.all(template.items.map(title => fetch('/api/planning', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trip_id: trip.id,
+          kind: 'packing',
+          title,
+          assigned_member_id: null,
+          member_id: currentMember?.id || null,
+        }),
+      })));
+      if (responses.some(response => !response.ok)) throw new Error('Could not add every checklist item');
+      toast.success(`${template.label} added to the shared checklist`);
+      await loadData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not apply packing template');
+      await loadData();
+    } finally {
+      setApplyingPackingTemplate(null);
+    }
+  };
+
   // Filtered packing items
   const filteredPacking = packing.filter(item => {
     if (packingFilter === 'all') return true;
@@ -388,6 +562,11 @@ export default function PlanPage() {
     }
     return item.assigned_member_id === packingFilter;
   });
+  const filteredItinerary = useMemo(() => {
+    const query = itineraryQuery.trim().toLowerCase();
+    if (!query) return itinerary;
+    return itinerary.filter(item => [item.title, item.location_name, item.details].some(value => value?.toLowerCase().includes(query)));
+  }, [itinerary, itineraryQuery]);
 
   const totalPacked = packing.filter(i => i.is_complete).length;
   const myItems = packing.filter(i => i.assigned_member_id === currentMember?.id);
@@ -541,6 +720,21 @@ export default function PlanPage() {
               </button>
             </div>
           </form>
+
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider font-mono text-[var(--text-muted)] mr-1">Quick packs</span>
+            {PACKING_TEMPLATES.map(template => (
+              <button
+                key={template.label}
+                type="button"
+                disabled={applyingPackingTemplate !== null}
+                onClick={() => void applyPackingTemplate(template)}
+                className="px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] hover:border-emerald-500/50 text-[10px] font-bold text-[var(--text-secondary)] hover:text-emerald-600 transition-all disabled:opacity-50 cursor-pointer"
+              >
+                {applyingPackingTemplate === template.label ? 'Adding…' : template.label}
+              </button>
+            ))}
+          </div>
 
           {/* Packing Items List */}
           <div className="space-y-2 pt-1">
@@ -734,21 +928,80 @@ export default function PlanPage() {
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsAddingItinerary(!isAddingItinerary)}
-              className="px-3 py-1.5 rounded-xl bg-[var(--accent)] text-white text-xs font-bold shadow-sm flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shrink-0 self-start sm:self-auto"
-            >
-              {isAddingItinerary ? (
-                <>
-                  <X className="w-3.5 h-3.5" /> Cancel
-                </>
-              ) : (
-                <>
-                  <Plus className="w-3.5 h-3.5" /> Add Stop
-                </>
-              )}
-            </button>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <select
+                value={calendarReminderMinutes}
+                onChange={event => setCalendarReminderMinutes(Number(event.target.value))}
+                className="hidden sm:block max-w-28 px-2 py-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] text-[10px] font-bold text-[var(--text-secondary)] cursor-pointer"
+                aria-label="Calendar reminder time"
+              >
+                <option value={10}>Remind 10m</option>
+                <option value={30}>Remind 30m</option>
+                <option value={60}>Remind 1h</option>
+                <option value={1440}>Remind 1d</option>
+              </select>
+              <button
+                type="button"
+                onClick={exportItineraryCalendar}
+                className="px-3 py-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-inset)] text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                title="Download scheduled stops as a calendar file"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Export calendar</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsAddingItinerary(!isAddingItinerary)}
+                className="px-3 py-1.5 rounded-xl bg-[var(--accent)] text-white text-xs font-bold shadow-sm flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shrink-0"
+              >
+                {isAddingItinerary ? (
+                  <>
+                    <X className="w-3.5 h-3.5" /> Cancel
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-3.5 h-3.5" /> Add Stop
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div className="relative">
+            <input
+              type="search"
+              value={itineraryQuery}
+              onChange={event => setItineraryQuery(event.target.value)}
+              placeholder="Find a stop, place, or booking note…"
+              className="w-full inset-field px-3.5 py-2.5 text-xs font-semibold text-[var(--text-primary)] rounded-xl"
+            />
+          </div>
+
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-inset)] p-3 sm:p-3.5">
+            <div className="flex items-center gap-2 mb-2.5">
+              <Wand2 className="w-3.5 h-3.5 text-[var(--accent)]" />
+              <p className="text-[10px] font-bold tracking-wider uppercase font-mono text-[var(--text-muted)]">
+                Start with a useful outline
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {ITINERARY_TEMPLATES.map(template => (
+                <button
+                  key={template.label}
+                  type="button"
+                  disabled={applyingTemplate !== null}
+                  onClick={() => void applyItineraryTemplate(template)}
+                  className="text-left p-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] hover:border-[var(--accent)]/50 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:hover:translate-y-0 cursor-pointer"
+                >
+                  <span className="block text-xs font-bold text-[var(--text-primary)]">
+                    {applyingTemplate === template.label ? 'Adding stops…' : template.label}
+                  </span>
+                  <span className="block mt-0.5 text-[10px] leading-relaxed text-[var(--text-muted)]">
+                    {template.description}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* New Itinerary Form */}
@@ -853,9 +1106,16 @@ export default function PlanPage() {
               </div>
             )}
 
-            {itinerary.map(item => {
+            {!loading && itinerary.length > 0 && filteredItinerary.length === 0 && (
+              <div className="text-center py-6 rounded-2xl bg-[var(--surface-inset)] border border-dashed border-[var(--border)]">
+                <p className="text-xs font-bold text-[var(--text-secondary)]">No itinerary stops match “{itineraryQuery}”</p>
+              </div>
+            )}
+
+            {filteredItinerary.map(item => {
               const isEditing = editingItineraryId === item.id;
               const formattedTime = formatItineraryTime(item.starts_at);
+              const googleCalendarLink = googleCalendarUrl(item);
 
               if (isEditing) {
                 return (
@@ -963,9 +1223,22 @@ export default function PlanPage() {
                     <div className="min-w-0 flex-1 space-y-1">
                       {/* Time pill if present */}
                       {formattedTime && (
-                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--surface-raised)] text-[10px] font-mono font-bold text-[var(--accent)] border border-[var(--border)]">
-                          <Clock className="w-3 h-3" />
-                          <span>{formattedTime}</span>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--surface-raised)] text-[10px] font-mono font-bold text-[var(--accent)] border border-[var(--border)]">
+                            <Clock className="w-3 h-3" />
+                            <span>{formattedTime}</span>
+                          </div>
+                          {googleCalendarLink && (
+                            <a
+                              href={googleCalendarLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-[10px] font-bold text-[var(--accent)] hover:underline"
+                              title="Add this stop to Google Calendar"
+                            >
+                              <CalendarPlus className="w-3 h-3" /> Google Calendar
+                            </a>
+                          )}
                         </div>
                       )}
 
@@ -974,10 +1247,21 @@ export default function PlanPage() {
                       </h3>
 
                       {item.location_name && (
-                        <p className="text-xs text-[var(--text-secondary)] flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-[var(--text-muted)] shrink-0" />
-                          <span className="truncate">{item.location_name}</span>
-                        </p>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <p className="text-xs text-[var(--text-secondary)] flex items-center gap-1 min-w-0">
+                            <MapPin className="w-3 h-3 text-[var(--text-muted)] shrink-0" />
+                            <span className="truncate">{item.location_name}</span>
+                          </p>
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.location_name)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold text-[var(--accent)] hover:underline"
+                            title={`Open ${item.location_name} in Google Maps`}
+                          >
+                            Map <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
                       )}
 
                       {item.details && (

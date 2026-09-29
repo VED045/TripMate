@@ -34,18 +34,23 @@ export async function GET() {
     const enriched = await Promise.all([...tripMap.values()].map(async trip => {
       const [membersRes, expensesRes] = await Promise.all([
         supabase.from('members').select('id', { count: 'exact', head: true }).eq('trip_id', trip.id),
-        supabase.from('expenses').select('amount_paise').eq('trip_id', trip.id),
+        supabase.from('expenses').select('amount_paise, paid_by').eq('trip_id', trip.id),
       ]);
-      const total_paise = (expensesRes.data || []).reduce((sum: number, expense: { amount_paise: number }) => sum + expense.amount_paise, 0);
+      const expenses = (expensesRes.data || []) as Array<{ amount_paise: number; paid_by: string }>;
+      const total_paise = expenses.reduce((sum, expense) => sum + expense.amount_paise, 0);
+      const my_spent_paise = expenses
+        .filter(expense => expense.paid_by === trip.claimed_member_id)
+        .reduce((sum, expense) => sum + expense.amount_paise, 0);
       const endDate = typeof trip.end_date === 'string' ? trip.end_date : null;
-      return { ...trip, total_paise, member_count: membersRes.count || 0, status: endDate && new Date(endDate) < new Date() ? 'completed' : 'active' };
-    })) as Array<Record<string, unknown> & { total_paise: number; member_count: number; status: string }>;
+      return { ...trip, total_paise, my_spent_paise, member_count: membersRes.count || 0, status: endDate && new Date(endDate) < new Date() ? 'completed' : 'active' };
+    })) as Array<Record<string, unknown> & { total_paise: number; my_spent_paise: number; member_count: number; status: string }>;
 
     return NextResponse.json({
       trips: enriched,
       stats: {
         totalTrips: enriched.length,
-        totalSpent: enriched.reduce((sum, trip) => sum + trip.total_paise, 0),
+        mySpent: enriched.reduce((sum, trip) => sum + trip.my_spent_paise, 0),
+        totalTripSpend: enriched.reduce((sum, trip) => sum + trip.total_paise, 0),
         currency: (enriched[0]?.currency as string) || 'INR',
         activeTripCount: enriched.filter(trip => trip.status === 'active').length,
       },

@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Camera, Upload, Sparkles, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Camera, Upload, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { GradientButton } from '@/components/ui/Button';
 import { scanReceiptImage, type OcrResult } from '@/lib/ai/ocrScanner';
-import type { Member, ItemFormRow } from '@/types';
+import type { Member } from '@/types';
 import { toast } from 'sonner';
 
 interface BillOcrModalProps {
@@ -74,23 +74,26 @@ export function BillOcrModal({
       isOpen={isOpen}
       onClose={onClose}
       title="Scan Bill / Receipt (AI OCR)"
-      subtitle="Upload or capture restaurant & hotel bills"
+      subtitle="Read receipt text locally, then refine it with your downloaded AI model when available"
     >
       <div className="p-5 space-y-4">
         {/* File upload container */}
         {!imagePreview && (
-          <label className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-[var(--border-strong)] rounded-2xl bg-[var(--surface-inset)] cursor-pointer hover:border-[var(--accent)] transition-all">
-            <Camera className="w-8 h-8 text-[var(--accent)] mb-2" />
-            <span className="text-xs font-bold text-[var(--text-primary)]">Take Photo or Upload Receipt</span>
-            <span className="text-[10px] text-[var(--text-muted)] mt-1">Supports PNG, JPG, WEBP</span>
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-          </label>
+          <div className="p-5 border-2 border-dashed border-[var(--border-strong)] rounded-2xl bg-[var(--surface-inset)]">
+            <Camera className="w-8 h-8 text-[var(--accent)] mx-auto mb-2" />
+            <p className="text-xs font-bold text-[var(--text-primary)] text-center">Add a receipt image</p>
+            <p className="text-[10px] text-[var(--text-muted)] text-center mt-1">Take a new photo or choose an existing PNG, JPG, or WEBP.</p>
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <label className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-[var(--accent)] text-white text-xs font-bold cursor-pointer">
+                <Camera className="w-3.5 h-3.5" /> Take photo
+                <input type="file" accept="image/*" capture="environment" onChange={handleFileSelect} className="hidden" />
+              </label>
+              <label className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] text-[var(--text-secondary)] text-xs font-bold cursor-pointer">
+                <Upload className="w-3.5 h-3.5" /> Choose photo
+                <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+              </label>
+            </div>
+          </div>
         )}
 
         {/* Image preview + Scanning indicator */}
@@ -108,7 +111,7 @@ export function BillOcrModal({
             </div>
 
             <label className="block text-center text-xs font-semibold text-[var(--accent)] cursor-pointer hover:underline">
-              Change image
+              Choose a different photo
               <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
             </label>
           </div>
@@ -124,6 +127,9 @@ export function BillOcrModal({
                 </h4>
                 <p className="text-[10px] text-[var(--text-muted)]">
                   Subtotal: ₹{ocrResult.subtotal.toFixed(2)} · GST: {ocrResult.gstPercent}% · Total: ₹{ocrResult.total.toFixed(2)}
+                </p>
+                <p className="text-[10px] text-[var(--text-muted)] mt-1">
+                  {ocrResult.aiAssisted ? 'On-device AI refined the OCR text. Please review before applying.' : 'Text recognition result. Download an on-device model for AI refinement.'}
                 </p>
               </div>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--success-light)] text-[var(--success)]">
@@ -147,6 +153,12 @@ export function BillOcrModal({
               <div className="p-3 rounded-xl bg-[var(--pending-bg)] text-xs text-[var(--warning)] flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
                 <span>No distinct items extracted. Total amount can still be applied.</span>
+              </div>
+            )}
+
+            {ocrResult.missingFields && ocrResult.missingFields.length > 0 && (
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-[10px] text-amber-700 dark:text-amber-300">
+                Please confirm: {ocrResult.missingFields.join(', ')}. You can correct these in the expense form before saving.
               </div>
             )}
 
