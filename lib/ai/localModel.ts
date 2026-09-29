@@ -12,7 +12,6 @@ export interface LocalAiModel {
   modelId: string;
   dtype: 'q4';
   minimumFreeStorageBytes: number;
-  requiresWebGpu?: boolean;
 }
 
 export const LOCAL_AI_MODELS: Record<LocalAiTier, LocalAiModel> = {
@@ -25,7 +24,7 @@ export const LOCAL_AI_MODELS: Record<LocalAiTier, LocalAiModel> = {
     modelId: 'onnx-community/Qwen2.5-0.5B-Instruct',
     dtype: 'q4',
     // Browser caches need workspace for model shards plus a temporary compile copy.
-    minimumFreeStorageBytes: 1_300_000_000,
+    minimumFreeStorageBytes: 900_000_000,
   },
   enhanced: {
     id: 'qwen2.5-1.5b-q4',
@@ -35,9 +34,8 @@ export const LOCAL_AI_MODELS: Record<LocalAiTier, LocalAiModel> = {
     estimatedDownload: 'about 1.8 GB',
     modelId: 'onnx-community/Qwen2.5-1.5B-Instruct',
     dtype: 'q4',
-    // The 1.5B model is too large for reliable WASM inference on phones.
-    minimumFreeStorageBytes: 3_200_000_000,
-    requiresWebGpu: true,
+    // Q4 weights plus browser cache/runtime workspace.
+    minimumFreeStorageBytes: 2_200_000_000,
   },
 };
 
@@ -85,9 +83,6 @@ async function getWorkingWebGpu() {
 }
 
 async function ensureDownloadCapacity(model: LocalAiModel) {
-  if (model.requiresWebGpu && !(await getWorkingWebGpu())) {
-    throw new LocalAiDownloadError('The Enhanced 1.5B model needs WebGPU. This phone can use the Standard model instead.');
-  }
   try {
     await navigator.storage?.persist?.();
     const estimate = await navigator.storage?.estimate?.();
@@ -145,8 +140,8 @@ export async function downloadLocalAiModel(
     localStorage.setItem(storageKey(tier), 'ready');
     onProgress?.(100, 'Ready on this device');
   } catch (error) {
-    if (tier === 'standard' && device === 'webgpu') {
-      onProgress?.(null, 'WebGPU was unavailable. Retrying with WASM…');
+    if (device === 'webgpu') {
+      onProgress?.(null, 'WebGPU could not start this model. Retrying with Q4 WASM…');
       const pipeline = await load('wasm');
       loadedPipelines.set(tier, pipeline);
       localStorage.setItem(storageKey(tier), 'ready');
@@ -157,9 +152,7 @@ export async function downloadLocalAiModel(
     if (/quota|storage|space/i.test(message)) {
       throw new LocalAiDownloadError(`Browser storage ran out while preparing this model. Free storage, remove a model, then retry. (${message})`);
     }
-    if (tier === 'enhanced') {
-      throw new LocalAiDownloadError(`The Enhanced 1.5B model could not start on this device. Use Standard, or try a WebGPU-capable desktop browser. (${message})`);
-    }
+    if (tier === 'enhanced') throw new LocalAiDownloadError(`The Enhanced 1.5B model could not start after both WebGPU and Q4 WASM were tried. Clear the partial download and retry on Wi-Fi. (${message})`);
     throw new LocalAiDownloadError(`The Standard model could not start. Try again on Wi-Fi or clear the partial download. (${message})`);
   }
 }
