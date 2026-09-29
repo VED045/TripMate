@@ -11,6 +11,8 @@ export interface LocalAiModel {
   estimatedDownload: string;
   modelId: string;
   dtype: 'q4';
+  minimumFreeStorageBytes: number;
+  requiresWebGpu?: boolean;
 }
 
 export const LOCAL_AI_MODELS: Record<LocalAiTier, LocalAiModel> = {
@@ -22,6 +24,8 @@ export const LOCAL_AI_MODELS: Record<LocalAiTier, LocalAiModel> = {
     estimatedDownload: 'about 500 MB',
     modelId: 'onnx-community/Qwen2.5-0.5B-Instruct',
     dtype: 'q4',
+    // Browser caches need workspace for model shards plus a temporary compile copy.
+    minimumFreeStorageBytes: 1_300_000_000,
   },
   enhanced: {
     id: 'qwen2.5-1.5b-q4',
@@ -31,6 +35,9 @@ export const LOCAL_AI_MODELS: Record<LocalAiTier, LocalAiModel> = {
     estimatedDownload: 'about 1.8 GB',
     modelId: 'onnx-community/Qwen2.5-1.5B-Instruct',
     dtype: 'q4',
+    // The 1.5B model is too large for reliable WASM inference on phones.
+    minimumFreeStorageBytes: 3_200_000_000,
+    requiresWebGpu: true,
   },
 };
 
@@ -44,6 +51,13 @@ export interface LocalAiStatus {
 type Transformers = typeof import('@huggingface/transformers');
 type TextGenerator = (messages: Array<{ role: string; content: string }>, options: { max_new_tokens: number; do_sample: boolean; temperature: number }) => Promise<Array<{ generated_text: Array<{ content: string }> }>>;
 
+export class LocalAiDownloadError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'LocalAiDownloadError';
+  }
+}
+
 let transformersPromise: Promise<Transformers> | null = null;
 const loadedPipelines = new Map<LocalAiTier, unknown>();
 
@@ -56,8 +70,44 @@ async function getTransformers(): Promise<Transformers> {
 
 function storageKey(tier: LocalAiTier) { return `tripmate_local_ai_${tier}`; }
 
+function formatGigabytes(bytes: number) {
+  return `${(bytes / (1024 ** 3)).toFixed(1)} GB`;
+}
+
+async function getWorkingWebGpu() {
+  if (typeof navigator === 'undefined' || !('gpu' in navigator)) return false;
+  try {
+    const gpu = (navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu;
+    return Boolean(await gpu?.requestAdapter());
+  } catch {
+    return false;
+  }
+}
+
+async function ensureDownloadCapacity(model: LocalAiModel) {
+  if (model.requiresWebGpu && !(await getWorkingWebGpu())) {
+    throw new LocalAiDownloadError('The Enhanced 1.5B model needs WebGPU. This phone can use the Standard model instead.');
+  }
+  try {
+    await navigator.storage?.persist?.();
+    const estimate = await navigator.storage?.estimate?.();
+    const freeBytes = estimate?.quota && estimate?.usage ? estimate.quota - estimate.usage : undefined;
+    if (freeBytes !== undefined && freeBytes < model.minimumFreeStorageBytes) {
+      throw new LocalAiDownloadError(`Not enough browser storage. Free at least ${formatGigabytes(model.minimumFreeStorageBytes)} and try again.`);
+    }
+  } catch (error) {
+    if (error instanceof LocalAiDownloadError) throw error;
+    // Storage estimates are not available on every mobile browser; let download continue.
+  }
+}
+
+function progressValue(value: number | undefined) {
+  if (typeof value !== 'number') return null;
+  return Math.max(0, Math.min(100, value <= 1 ? value * 100 : value));
+}
+
 export async function getLocalAiStatus(): Promise<LocalAiStatus> {
-  const webGpuAvailable = typeof navigator !== 'undefined' && 'gpu' in navigator;
+  const webGpuAvailable = await getWorkingWebGpu();
   const estimate = await navigator.storage?.estimate?.();
   const downloaded = {
     standard: localStorage.getItem(storageKey('standard')) === 'ready',
@@ -78,36 +128,39 @@ export async function downloadLocalAiModel(
 ): Promise<void> {
   const transformers = await getTransformers();
   const model = LOCAL_AI_MODELS[tier];
-  const device = typeof navigator !== 'undefined' && 'gpu' in navigator ? 'webgpu' : 'wasm';
+  await ensureDownloadCapacity(model);
+  const device = (await getWorkingWebGpu()) ? 'webgpu' : 'wasm';
 
-  onProgress?.(0, 'Preparing secure local download…');
+  onProgress?.(0, 'Checking device and preparing download…');
+  const load = async (targetDevice: 'webgpu' | 'wasm') => transformers.pipeline('text-generation', model.modelId, {
+    dtype: model.dtype,
+    device: targetDevice,
+    progress_callback: (event: { status?: string; progress?: number }) => {
+      onProgress?.(progressValue(event.progress), event.status || 'Downloading…');
+    },
+  });
   try {
-    const pipeline = await transformers.pipeline('text-generation', model.modelId, {
-      dtype: model.dtype,
-      device,
-      progress_callback: (event: { status?: string; progress?: number }) => {
-        onProgress?.(typeof event.progress === 'number' ? event.progress : null, event.status || 'Downloading…');
-      },
-    });
+    const pipeline = await load(device);
     loadedPipelines.set(tier, pipeline);
     localStorage.setItem(storageKey(tier), 'ready');
     onProgress?.(100, 'Ready on this device');
   } catch (error) {
-    if (device === 'webgpu') {
+    if (tier === 'standard' && device === 'webgpu') {
       onProgress?.(null, 'WebGPU was unavailable. Retrying with WASM…');
-      const pipeline = await transformers.pipeline('text-generation', model.modelId, {
-        dtype: model.dtype,
-        device: 'wasm',
-        progress_callback: (event: { status?: string; progress?: number }) => {
-          onProgress?.(typeof event.progress === 'number' ? event.progress : null, event.status || 'Downloading…');
-        },
-      });
+      const pipeline = await load('wasm');
       loadedPipelines.set(tier, pipeline);
       localStorage.setItem(storageKey(tier), 'ready');
       onProgress?.(100, 'Ready with WASM');
       return;
     }
-    throw error;
+    const message = error instanceof Error ? error.message : 'Unknown browser error';
+    if (/quota|storage|space/i.test(message)) {
+      throw new LocalAiDownloadError(`Browser storage ran out while preparing this model. Free storage, remove a model, then retry. (${message})`);
+    }
+    if (tier === 'enhanced') {
+      throw new LocalAiDownloadError(`The Enhanced 1.5B model could not start on this device. Use Standard, or try a WebGPU-capable desktop browser. (${message})`);
+    }
+    throw new LocalAiDownloadError(`The Standard model could not start. Try again on Wi-Fi or clear the partial download. (${message})`);
   }
 }
 

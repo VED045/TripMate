@@ -89,8 +89,7 @@ export default function ProfilePage() {
 
   const isCreator = Boolean(
     currentMember.is_admin ||
-    (trip.created_by && currentMember.id === trip.created_by) ||
-    (members.length > 0 && members[0]?.id === currentMember.id)
+    (trip.created_by && currentMember.id === trip.created_by)
   );
 
   const testAmountNumber = parseFloat(customAmountRupees || '0');
@@ -635,8 +634,7 @@ export default function ProfilePage() {
                     const payee = members.find(m => m.id === (debt.to_member_id || debt.toMemberId));
                     const isPayeeCreator = payee && Boolean(
                       payee.is_admin ||
-                      (trip.created_by && payee.id === trip.created_by) ||
-                      (members.length > 0 && members[0]?.id === payee.id)
+                      (trip.created_by && payee.id === trip.created_by)
                     );
                     const debtAmountPaise = debt.amount_paise || debt.amountPaise || 0;
                     const debtAmountRupees = debtAmountPaise / 100;
@@ -745,8 +743,7 @@ export default function ProfilePage() {
                     const payer = members.find(m => m.id === (debt.from_member_id || debt.fromMemberId));
                     const isPayerCreator = payer && Boolean(
                       payer.is_admin ||
-                      (trip.created_by && payer.id === trip.created_by) ||
-                      (members.length > 0 && members[0]?.id === payer.id)
+                      (trip.created_by && payer.id === trip.created_by)
                     );
                     const debtAmountPaise = debt.amount_paise || debt.amountPaise || 0;
                     const debtAmountRupees = debtAmountPaise / 100;

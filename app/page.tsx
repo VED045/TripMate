@@ -115,7 +115,7 @@ export default function HomePage() {
     <div className="tripmate-landing min-h-screen flex flex-col relative overflow-hidden" style={{ background: 'var(--background)' }}>
       {/* Top Header */}
       <header className="sticky top-0 z-40 w-full backdrop-blur-xl border-b border-[var(--border)]" style={{ background: 'var(--surface-overlay)' }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           <Link href="/" className="flex items-center gap-2.5 group">
             <div
               className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center text-white shadow-md transition-transform group-hover:scale-105"
@@ -127,13 +127,13 @@ export default function HomePage() {
               <span className="font-outfit font-black text-lg sm:text-xl tracking-tight text-[var(--text-primary)]">
                 Trip<span style={{ color: 'var(--accent)' }}>Mate</span>
               </span>
-              <div className="text-[8.5px] font-mono tracking-widest text-[var(--text-muted)] uppercase -mt-0.5">
+              <div className="hidden sm:block text-[8.5px] font-mono tracking-widest text-[var(--text-muted)] uppercase -mt-0.5">
                 Trip Operating System
               </div>
             </div>
           </Link>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {authLoading ? (
               <div className="w-8 h-8 rounded-full bg-[var(--surface-inset)] animate-pulse" />
             ) : user ? (
@@ -173,17 +173,11 @@ export default function HomePage() {
                   Sign In
                 </Link>
                 <Link
-                  href="/signup"
-                  className="px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold text-[var(--accent)] hover:bg-[var(--surface-inset)] transition-all"
-                >
-                  Sign Up
-                </Link>
-                <Link
                   href="/create"
                   className="px-3.5 py-2 rounded-xl text-white font-bold text-xs shadow-md transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
                   style={{ background: 'linear-gradient(135deg, #2b56ff, #163ecf)' }}
                 >
-                  <Plus className="w-3.5 h-3.5" /> Start Trip
+                  <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Start a trip</span><span className="sm:hidden">Start</span>
                 </Link>
               </>
             )}

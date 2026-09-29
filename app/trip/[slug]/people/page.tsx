@@ -153,8 +153,7 @@ export default function PeoplePage() {
               const isTopSpender = rank === 1 && paidPaise > 0;
               const isMemberCreator = Boolean(
                 member.is_admin ||
-                (trip.created_by && member.id === trip.created_by) ||
-                (members.length > 0 && members[0]?.id === member.id)
+                (trip.created_by && member.id === trip.created_by)
               );
 
               return (

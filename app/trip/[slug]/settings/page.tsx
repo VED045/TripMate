@@ -151,8 +151,7 @@ export default function SettingsPage() {
 
   const isCreator = Boolean(
     currentMember?.is_admin ||
-    (trip.created_by && currentMember?.id === trip.created_by) ||
-    (members.length > 0 && members[0]?.id === currentMember?.id)
+    (trip.created_by && currentMember?.id === trip.created_by)
   );
 
   if (!isCreator) {

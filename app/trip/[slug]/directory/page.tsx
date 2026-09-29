@@ -383,7 +383,7 @@ export default function DirectoryPage() {
                     value: m.id,
                     label: `👤 ${m.name}'s Family Contacts`,
                     color: m.color,
-                    isCreator: Boolean(m.is_admin || (trip?.created_by && m.id === trip.created_by) || (members.length > 0 && members[0]?.id === m.id)),
+                    isCreator: Boolean(m.is_admin || (trip?.created_by && m.id === trip.created_by)),
                   })),
                 ]}
                 className="w-full sm:w-auto min-w-[220px]"
@@ -612,7 +612,7 @@ export default function DirectoryPage() {
                         value: m.id,
                         label: `${m.name}${m.id === currentMember?.id ? ' (You)' : ''}`,
                         color: m.color,
-                        isCreator: Boolean(m.is_admin || (trip?.created_by && m.id === trip.created_by) || (members.length > 0 && members[0]?.id === m.id)),
+                        isCreator: Boolean(m.is_admin || (trip?.created_by && m.id === trip.created_by)),
                       }))}
                       className="w-full"
                     />

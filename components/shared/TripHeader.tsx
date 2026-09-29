@@ -53,8 +53,7 @@ export function TripHeader({
   );
   const isCreator = Boolean(
     currentMember?.is_admin ||
-    (trip?.created_by && currentMember?.id === trip.created_by) ||
-    (members.length > 0 && members[0]?.id === currentMember?.id)
+    (trip?.created_by && currentMember?.id === trip.created_by)
   );
 
   // Close auth menu on click outside
@@ -162,8 +161,7 @@ export function TripHeader({
               options={members.map((m) => {
                 const isMemberCreator = Boolean(
                   m.is_admin ||
-                  (trip?.created_by && m.id === trip.created_by) ||
-                  (members.length > 0 && members[0]?.id === m.id)
+                  (trip?.created_by && m.id === trip.created_by)
                 );
                 return {
                   value: m.id,
