@@ -375,13 +375,13 @@ export default function DirectoryPage() {
                 options={[
                   ...(currentMember ? [{
                     value: 'my_family',
-                    label: `📱 My Family Contacts (${currentMember.name}) [DEFAULT]`,
+                    label: `My family · ${currentMember.name}`,
                     color: currentMember.color,
                   }] : []),
-                  { value: 'all', label: '👥 All Crew Family Contacts' },
+                  { value: 'all', label: 'All family contacts' },
                   ...members.map((m) => ({
                     value: m.id,
-                    label: `👤 ${m.name}'s Family Contacts`,
+                    label: `${m.name}'s family contacts`,
                     color: m.color,
                     isCreator: Boolean(m.is_admin || (trip?.created_by && m.id === trip.created_by)),
                   })),

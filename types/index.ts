@@ -207,6 +207,9 @@ export interface Album {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  media_count?: number;
+  preview_thumbnails?: string[];
+  media_ids?: string[];
 }
 
 export interface AlbumMedia {

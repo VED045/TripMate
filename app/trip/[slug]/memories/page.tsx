@@ -37,6 +37,7 @@ export default function MemoriesPage() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'photos' | 'videos' | 'favorites' | 'albums'>('all');
   const [selectedTagMember, setSelectedTagMember] = useState<string>('all');
+  const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(null);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -135,6 +136,10 @@ export default function MemoriesPage() {
 
   // Filter media
   const filteredMedia = mediaList.filter((m) => {
+    if (selectedAlbumId) {
+      const album = albums.find((candidate) => candidate.id === selectedAlbumId);
+      if (!album?.media_ids?.includes(m.id)) return false;
+    }
     if (activeTab === 'photos' && m.media_type !== 'photo') return false;
     if (activeTab === 'videos' && m.media_type !== 'video') return false;
     if (activeTab === 'favorites' && !m.is_favorite) return false;
@@ -174,6 +179,7 @@ export default function MemoriesPage() {
                 key={key}
                 onClick={(e) => {
                   setActiveTab(key as any);
+                  if (key === 'all') setSelectedAlbumId(null);
                   (e.currentTarget as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
                 }}
                 className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap ${activeTab === key
@@ -194,8 +200,8 @@ export default function MemoriesPage() {
                 value={selectedTagMember}
                 onChange={setSelectedTagMember}
                 options={[
-                  { value: 'all', label: "Everyone's Media" },
-                  ...members.map((m) => ({ value: m.id, label: `${m.name}'s Media`, color: m.color })),
+                  { value: 'all', label: 'All crew media' },
+                  ...members.map((m) => ({ value: m.id, label: `${m.name} · uploads & tags`, color: m.color })),
                 ]}
                 className="w-[130px] sm:w-[150px] shrink-0"
               />
@@ -233,8 +239,10 @@ export default function MemoriesPage() {
                 key={album.id}
                 album={album}
                 onClick={() => {
-                  toast.info(`Viewing album: ${album.name}`);
+                  setSelectedAlbumId(album.id);
+                  setSelectedTagMember('all');
                   setActiveTab('all');
+                  toast.info(`Showing ${album.name}`);
                 }}
               />
             ))}

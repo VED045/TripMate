@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 
+type AlbumMediaPreview = {
+  media?: {
+    id?: string;
+    url?: string | null;
+    thumbnail_url?: string | null;
+  } | null;
+};
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -31,11 +39,15 @@ export async function GET(req: NextRequest) {
 
     if (error) throw error;
 
-    const enriched = (albums || []).map((album: any) => ({
+    const enriched = (albums || []).map((album) => {
+      const albumMedia = (album.album_media || []) as AlbumMediaPreview[];
+      return {
       ...album,
-      media_count: album.album_media?.length || 0,
-      preview_thumbnails: album.album_media?.slice(0, 4).map((am: any) => am.media?.thumbnail_url || am.media?.url).filter(Boolean) || [],
-    }));
+      media_count: albumMedia.length,
+      preview_thumbnails: albumMedia.slice(0, 4).map((am) => am.media?.thumbnail_url || am.media?.url).filter((url): url is string => Boolean(url)),
+      media_ids: albumMedia.map((am) => am.media?.id).filter((id): id is string => Boolean(id)),
+    };
+    });
 
     return NextResponse.json(enriched);
   } catch (err: unknown) {

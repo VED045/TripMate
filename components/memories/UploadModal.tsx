@@ -87,7 +87,10 @@ export function UploadModal({
       });
       formData.append('trip_id', tripId);
       if (currentMemberId) formData.append('uploader_id', currentMemberId);
-      if (selectedAlbumId) formData.append('album_ids', JSON.stringify([selectedAlbumId]));
+      // Albums can load after this modal mounts. Resolve the default here so
+      // uploads still land in the Everyone album instead of becoming unfiled.
+      const targetAlbumId = selectedAlbumId || albums[0]?.id;
+      if (targetAlbumId) formData.append('album_ids', JSON.stringify([targetAlbumId]));
       if (selectedMembers.length > 0) formData.append('tag_member_ids', JSON.stringify(selectedMembers));
 
       setUploadProgress(35);
@@ -261,7 +264,7 @@ export function UploadModal({
               <FolderPlus className="w-3.5 h-3.5 text-[var(--accent)]" /> Add to Album
             </label>
             <select
-              value={selectedAlbumId}
+              value={selectedAlbumId || albums[0]?.id || ''}
               onChange={(e) => setSelectedAlbumId(e.target.value)}
               className="w-full inset-field px-3.5 py-2.5 text-xs font-semibold text-[var(--text-primary)] bg-[var(--surface-inset)] border border-[var(--border)] rounded-xl focus:outline-none"
             >
