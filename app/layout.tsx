@@ -11,6 +11,11 @@ export const metadata: Metadata = {
   keywords: ['trip', 'travel', 'expenses', 'split bills', 'UPI', 'photos', 'friends', 'group travel'],
   authors: [{ name: 'TripMate' }],
   manifest: '/manifest.json',
+  icons: {
+    icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
+    shortcut: ['/icon.svg'],
+    apple: [{ url: '/icon.svg', type: 'image/svg+xml' }],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -56,7 +61,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
       </head>
       <body>
         <AuthProvider>

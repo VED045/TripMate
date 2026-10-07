@@ -4,14 +4,15 @@
   "description": "Shared operating system for trips: split expenses via UPI, vault high-res media, real-time balances & analytics.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#020617",
-  "theme_color": "#0f172a",
+  "background_color": "#eff4ff",
+  "theme_color": "#2b56ff",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     }
   ]
 }
